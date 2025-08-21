@@ -1,0 +1,15 @@
+Parameters,Values,Unit
+Max total connections,37,-
+Optimised connections,0,-
+Total capture potential,7.30009275533416,MtCO2pa
+Total capture volume,0.0,MtCO2pa
+Total capture volume fossil,0.0,MtCO2pa
+Total capture volume bio,0.0,MtCO2pa
+Biomass use,10.720097174295299,TWhpa
+Average T&S costs,-Inf,EUR/tCO2pa
+Total costs,0,EUR/tCO2Reducedpa
+Pipeline cost,-3.575781450776563e-9,MEURpa
+Storage cost,1.1156887205037956e-9,MEURpa
+Booster cost,-8.623913978916086e-10,MEURpa
+MIPgap,0.0,%
+C-grid-type,coarse,-
