@@ -1,11 +1,11 @@
 using PyCall
 using PlotlyJS 
 using Kaleido
-ENV["PYTHON"] = raw"C:\Users\VERBISTF\AppData\Local\Programs\Python\Python39\python.exe" # THis needs to change in HPC to ENV["PYTHON"] = "/usr/bin/python3"
-# Pkg.build("PyCall")
+ENV["PYTHON"] = raw"C:\Users\VERBISTF\AppData\Local\Programs\Python\Python313\python.exe" # THis needs to change in HPC to ENV["PYTHON"] = "/usr/bin/python3"
+#Pkg.build("PyCall")
 # If package version not recoganised by PyCall, type: pip install "package name" 
 # rerun Pkg.build("PyCall")
-
+# py -m pip install numpy pandas geopandas seaborn plotly matplotlib contextily pyproj 
 np = pyimport("numpy")
 gpd = pyimport("geopandas")
 pd = pyimport("pandas")
@@ -48,8 +48,8 @@ rc("font", family="serif")
 function sankey_scenario_change_py(results_industry_file, Scenario_name_1::String, Scenario_name_2::String, Figure_name::String)
   
 
-    Industry_connection_results_1 =  DataFrame(XLSX.readtable(results_industry_file,  "$(Scenario_name_1)_$(Region)_$(CO2_tax)"))
-    Industry_connection_results_2 =  DataFrame(XLSX.readtable(results_industry_file,  "$(Scenario_name_2)_$(Region)_$(CO2_tax)"))
+    Industry_connection_results_1 =  DataFrame(XLSX.readtable(results_industry_file,  "$(Scenario_name_1)_$(CO2_tax)_$(Subcase_name)"))
+    Industry_connection_results_2 =  DataFrame(XLSX.readtable(results_industry_file,  "$(Scenario_name_2)_$(CO2_tax)_$(Subcase_name)"))
     DF_sankey = DataFrame(
         Emitter_id = EMITTERS,
         Scenario_1 = fill("", length(EMITTERS)),
@@ -70,9 +70,9 @@ function sankey_scenario_change_py(results_industry_file, Scenario_name_1::Strin
             if cc_emitter_1[e] .>= 0.5 # most optimal route of scenario 1 contains corbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_1"] = Emitters_1[Emitters_1[:, "Emitter_id"] .== e, "Route_name_1"]
                 if Emitter_extract_1[Emitter_extract_1[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Bio + CCS"
                 else 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Fossil + CCS"
                 end
             else  # optimal route of scenario 1 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_1"] = Emitters_1[Emitters_1[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -96,9 +96,9 @@ function sankey_scenario_change_py(results_industry_file, Scenario_name_1::Strin
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_2"] = Emitters_2[Emitters_2[:, "Emitter_id"] .== e, "Route_name_1"]
 
                 if Emitter_extract_2[Emitter_extract_2[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Bio + CCS"
                 else
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Fossil + CCS"
                 end
             else   # optimal route of scenario 2 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_2"] = Emitters_2[Emitters_2[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -128,7 +128,7 @@ function sankey_scenario_change_py(results_industry_file, Scenario_name_1::Strin
     
   
     ax1 = plt.axes()
-    colors = Dict("Other" => "black", "Bio" => "lightgreen", "Fossil + CC" => "grey", "Bio + CC" => "darkgreen", "Fossil" => "brown", "Electric" => "steelblue", "Exit" => "black")
+    colors = Dict("Other" => "black", "Bio" => "lightgreen", "Fossil + CCS" => "grey", "Bio + CCS" => "darkgreen", "Fossil" => "brown", "Electric" => "steelblue", "Exit" => "black")
     ax1 = sankey(DF_sankey[!,"Scenario_1"], DF_sankey[!,"Scenario_2"],  colorDict=colors, aspect=10, fontsize=12) #    leftWeight=DF_sankey[!, "left_weight"], rightWeight=DF_sankey[!, "right_weight"], 
     plt.annotate("No CDR credits", xy = (-1.7, length(EMITTERS) + 20), fontsize = 12,  fontweight="bold")
     plt.annotate("CDR credits", xy = (20, length(EMITTERS) + 20), fontsize = 12, fontweight="bold")
@@ -141,11 +141,11 @@ function sankey_scenario_change_py(results_industry_file, Scenario_name_1::Strin
     return DF_sankey 
 end
 
-function sankey_3_scenario_change_py(results_industry_file, Scenario_name_1::String, Scenario_name_2::String, Scenario_name_3::String, Figure_name::String, Plotting::Bool)
+function sankey_3_scenario_change_py(Scenario_name_1::String, Scenario_name_2::String, Scenario_name_3::String, Plotting::Bool)
 
-    file_industry_1 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_HPC_$(Scenario_name_1)_$(Region)_$(CO2_tax).csv"
-    file_industry_2 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_HPC_$(Scenario_name_2)_$(Region)_$(CO2_tax).csv"
-    file_industry_3 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_HPC_$(Scenario_name_3)_$(Region)_$(CO2_tax).csv"
+    file_industry_1 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry$(Scenario_name_1)_$(CO2_tax)_$(Subcase_name).csv"
+    file_industry_2 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry$(Scenario_name_2)_$(CO2_tax)_$(Subcase_name).csv"
+    file_industry_3 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry$(Scenario_name_3)_$(CO2_tax)_$(Subcase_name).csv"
 
     Industry_connection_results_1 = CSV.read(file_industry_1, DataFrame)
     Industry_connection_results_2 = CSV.read(file_industry_2, DataFrame)   
@@ -184,9 +184,9 @@ function sankey_3_scenario_change_py(results_industry_file, Scenario_name_1::Str
             if cc_emitter_1[e] .>= 0.5 # most optimal route of scenario 1 contains corbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_1"] = Emitters_1[Emitters_1[:, "Emitter_id"] .== e, "Route_name_1"]
                 if Emitter_extract_1[Emitter_extract_1[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Bio + CCS"
                 else 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Fossil + CCS"
                 end
             else  # optimal route of scenario 1 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_1"] = Emitters_1[Emitters_1[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -210,9 +210,9 @@ function sankey_3_scenario_change_py(results_industry_file, Scenario_name_1::Str
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_2"] = Emitters_2[Emitters_2[:, "Emitter_id"] .== e, "Route_name_1"]
 
                 if Emitter_extract_2[Emitter_extract_2[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Bio + CCS"
                 else
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Fossil + CCS"
                 end
             else   # optimal route of scenario 2 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_2"] = Emitters_2[Emitters_2[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -238,9 +238,9 @@ function sankey_3_scenario_change_py(results_industry_file, Scenario_name_1::Str
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_3"] = Emitters_3[Emitters_3[:, "Emitter_id"] .== e, "Route_name_1"]
 
                 if Emitter_extract_3[Emitter_extract_3[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_3"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_3"] .=  "Bio + CCS"
                 else
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_3"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_3"] .=  "Fossil + CCS"
                 end
             else   # optimal route of scenario 2 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_3"] = Emitters_3[Emitters_3[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -266,7 +266,7 @@ function sankey_3_scenario_change_py(results_industry_file, Scenario_name_1::Str
     end
 
     # Step 1: Define labels and dimensions
-    Labels = ["Fossil", "Fossil + CC", "Bio", "Bio + CC", "Electric", "Other", "Exit"]
+    Labels = ["Fossil", "Fossil + CCS", "Bio", "Bio + CCS", "Electric", "Other", "Exit"]
     n_labels = length(Labels)
 
     # All labels for 3 scenarios
@@ -392,15 +392,15 @@ function sankey_3_scenario_change_py(results_industry_file, Scenario_name_1::Str
 end
 
 
-function sankey_2_scenario_change_py(results_industry_file, Scenario_name_1::String, Scenario_name_2::String, Figure_name::String, Plotting::Bool)
+function sankey_2_scenario_change_py(Scenario_name_1::String, Scenario_name_2::String, Plotting::Bool)
     
 
     if MPEC .== true 
         file_industry_1 = "./Output data files/CSV intermediaries $(detail_level)/MPEC/Results_industry_$(Scenario_name_1)_$(CO2_tax)_$(Subcase_name).csv"
         file_industry_2 = "./Output data files/CSV intermediaries $(detail_level)/MPEC/Results_industry_$(Scenario_name_2)_$(CO2_tax)_$(Subcase_name).csv"
     else   
-        file_industry_1 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_HPC_$(Scenario_name_1)_$(Region)_$(CO2_tax).csv"
-        file_industry_2 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_HPC_$(Scenario_name_2)_$(Region)_$(CO2_tax).csv"
+      file_industry_1 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_$(Scenario_name_1)_$(CO2_tax)_$(Subcase_name).csv"
+        file_industry_2 = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_$(Scenario_name_2)_$(CO2_tax)_$(Subcase_name).csv"
     end
     #
 
@@ -442,9 +442,9 @@ function sankey_2_scenario_change_py(results_industry_file, Scenario_name_1::Str
             if cc_emitter_1[e] .>= 0.5 # most optimal route of scenario 1 contains corbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_1"] = Emitters_1[Emitters_1[:, "Emitter_id"] .== e, "Route_name_1"]
                 if Emitter_extract_1[Emitter_extract_1[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Bio + CCS"
                 else 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_1"] .=  "Fossil + CCS"
                 end
             else  # optimal route of scenario 1 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_1"] = Emitters_1[Emitters_1[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -468,9 +468,9 @@ function sankey_2_scenario_change_py(results_industry_file, Scenario_name_1::Str
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_2"] = Emitters_2[Emitters_2[:, "Emitter_id"] .== e, "Route_name_1"]
 
                 if Emitter_extract_2[Emitter_extract_2[:,"Emitter_id"] .== e,"Capture_ofwhich_bio_1_tCO2ptpa"][1] > 0 
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Bio + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Bio + CCS"
                 else
-                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Fossil + CC"
+                    DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Scenario_2"] .=  "Fossil + CCS"
                 end
             else   # optimal route of scenario 2 does not contain carbon capture 
                 DF_sankey[DF_sankey[:, "Emitter_id"] .== e, "Route_sn_2"] = Emitters_2[Emitters_2[:, "Emitter_id"] .== e, "Route_name_noCC"]
@@ -498,7 +498,7 @@ function sankey_2_scenario_change_py(results_industry_file, Scenario_name_1::Str
         if Scenario_name_1 .== "No_CDR_price"
 
                     # Step 1: Define labels and dimensions
-            Labels = ["Fossil", "Fossil + CC", "Bio", "Bio + CC", "Electric", "Other", "Exit"]
+            Labels = ["Fossil", "Fossil + CCS", "Bio", "Bio + CCS", "Electric", "Other", "Exit"]
             n_labels = length(Labels)
 
             # All labels for 3 scenarios
@@ -577,6 +577,27 @@ function sankey_2_scenario_change_py(results_industry_file, Scenario_name_1::Str
                     :align => "center"
                 )
             ]
+              flow_annotations = []
+
+                # for i in eachindex(Sources)
+
+                #     push!(flow_annotations,
+                #         Dict(
+                #             :x => 0.25,   # halfway between columns
+                #             :y => 1 - (i / (length(Sources)+1)),   # spread vertically
+                #             :text => string(Values[i]),
+                #             :showarrow => false,
+                #             :font => Dict(
+                #                 :size => 12,
+                #                 :color => "black"
+                #             ),
+                #             :bgcolor => "white",
+                #             :bordercolor => "black",
+                #             :borderwidth => 1
+                #         )
+                #     )
+                # end
+
 
             # Step 7: Plot it!
 
@@ -598,19 +619,15 @@ function sankey_2_scenario_change_py(results_industry_file, Scenario_name_1::Str
                         :value=>Values,
                         :color=>link_colors_rgba)),
                 layout=Dict(
-                    :annotations=>annotations  # Add the scenario name annotation
+                    :annotations=>vcat(annotations, flow_annotations)  # Add the scenario name annotation
                 ))
-
-
-
-
-
+  
 
 
         else
 
             # Step 1: Define labels and dimensions
-            Labels = ["Fossil", "Fossil + CC", "Bio + CC", "Bio",  "Electric", "Exit", "Other"]
+            Labels = ["Fossil", "Fossil + CCS", "Bio + CCS", "Bio",  "Electric", "Exit", "Other"]
             n_labels = length(Labels)
 
             # All labels for 3 scenarios
@@ -804,37 +821,60 @@ def scale_capture_volume(min_size,max_size,capture_volume):
     return s_normalized
 """
 
-function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
+function visualisation_pipes(shapefile_eu, Scenario_name::String, Subcase_name::String)
 
+     Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
 
+    include("parameters.jl")    # run all the parameters of the script
+ 
     # Plotting
 
     fig, ax = plt.subplots(figsize=(8, 16))
-    divider = make_axes_locatable(ax)
-    
+
 
     if Region == "Trilateral"
-        trilateral= py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
-        borders = py"geo_coverage"(NUTS_level=0,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
-        non_trilateral= py"geo_coverage"(NUTS_level=2,codes=["FR","DE"],shapefile =shapefile_eu)
-        non_trilateral_2= py"geo_coverage"(NUTS_level=2,codes=["FR","DE", "NO", "SE", "DK", "LU"],shapefile =shapefile_eu)
-        other_borders = py"geo_coverage"(NUTS_level=0,codes=["FR","DE", "NO", "DK", "SE"],shapefile =shapefile_eu)
-        borders_NRW = py"geo_coverage"(NUTS_level=1,codes=["DEA"],shapefile =shapefile_eu)
+        if France == true
+            trilateral= py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA","FRE1","FRE2"],shapefile =shapefile_eu)
+            clusters_trilateral = py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA","FRE1","FRE2", "FRD2"],shapefile =shapefile_eu)
+            borders = py"geo_coverage"(NUTS_level=0,codes=["NL","BE","DEA","FRE1","FRE2"],shapefile =shapefile_eu)
+            non_trilateral= py"geo_coverage"(NUTS_level=2,codes=["FR","DE"],shapefile =shapefile_eu)
+            non_trilateral_2= py"geo_coverage"(NUTS_level=2,codes=["FR","DE", "NO", "SE", "DK", "LU"],shapefile =shapefile_eu)
+            other_borders = py"geo_coverage"(NUTS_level=0,codes=["FR","DE", "NO", "DK", "SE"],shapefile =shapefile_eu)
+            borders_NRW = py"geo_coverage"(NUTS_level=1,codes=["DEA", "FRE"],shapefile =shapefile_eu)
 
-        # Regions
-        # trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") # no provinces
-        non_trilateral_2.plot(ax=ax, color="whitesmoke", edgecolor="none", zorder=0)
-        borders_NRW.plot(ax=ax, color="white", edgecolor="none", zorder=0)
+            # Regions
+            # trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") # no provinces
+            non_trilateral_2.plot(ax=ax, color="lightgrey", edgecolor="none", zorder=0)
+            borders_NRW.plot(ax=ax, color="white", edgecolor="none", zorder=0)
 
-        borders.boundary.plot(ax=ax, linewidth=0.7,color="black")
-        # non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
-        other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
-        borders_NRW.boundary.plot(ax=ax, linewidth=0.7,color="black")
+            borders.boundary.plot(ax=ax, linewidth=0.9,color="black")
+            # non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
+            other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
+            borders_NRW.boundary.plot(ax=ax, linewidth=0.9,color="black")
+        else
+            trilateral= py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
+            clusters_trilateral = trilateral
+            borders = py"geo_coverage"(NUTS_level=0,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
+            non_trilateral= py"geo_coverage"(NUTS_level=2,codes=["FR","DE"],shapefile =shapefile_eu)
+            non_trilateral_2= py"geo_coverage"(NUTS_level=2,codes=["FR","DE", "NO", "SE", "DK", "LU"],shapefile =shapefile_eu)
+            other_borders = py"geo_coverage"(NUTS_level=0,codes=["FR","DE", "NO", "DK", "SE"],shapefile =shapefile_eu)
+            borders_NRW = py"geo_coverage"(NUTS_level=1,codes=["DEA"],shapefile =shapefile_eu)
 
+            # Regions
+            # trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") # no provinces
+            non_trilateral_2.plot(ax=ax, color="lightgrey", edgecolor="none", zorder=0)
+            borders_NRW.plot(ax=ax, color="white", edgecolor="none", zorder=0)
+
+            borders.boundary.plot(ax=ax, linewidth=0.9,color="black")
+            # non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
+            other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
+            borders_NRW.boundary.plot(ax=ax, linewidth=0.9,color="black")
+        end 
     elseif Region == "Europe"
         NUTS_ = gpd.read_file(shapefile_eu)
         non_trilateral= py"geo_coverage"(NUTS_level=2,codes=unique(NUTS_["CNTR_CODE"]),shapefile =shapefile_eu)
         other_borders = py"geo_coverage"(NUTS_level=0,codes=unique(NUTS_["CNTR_CODE"]),shapefile =shapefile_eu)
+        #  clusters_trilateral = trilateral
 
         non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
         other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
@@ -853,9 +893,9 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     Intercept = true  # True: binary variables for pipeline investments, false: no binary parameters for pipeline investments 
     global Costs, Routing_nodes_all, Pipelines_all, Terminals, Storage_offshore, Storage_inland, Offshore_nodes, Clusters = import_data_TandS(system_data_file) 
     include("parameters.jl")    # run all the parameters of the script 
-    global Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(results_pipes_Trilateral_file_HPC::String, Scenario_name::String, Region::String, CO2_tax::Int64)
+    global Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     # scenario_title = Scenario_title_vect[i]
-    global Industry_connection_results = industry_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    global Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
 
     capacity_cutout = 0.008
     cmap_style = "winter_r"
@@ -865,7 +905,8 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     catch 
         global v_max = v_min
     end
-
+    sm = plt.cm.ScalarMappable(cmap=cmap_style, norm=plt.Normalize(vmin=1, vmax=v_max))
+    sm.set_array([])
 
     for pipe in Pipe_coordinates
         plt.plot(
@@ -874,19 +915,19 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
             "--",  # Dashed line for candidate connections
             color="dimgrey",
             alpha = 0.5, 
-            linewidth=0.5,
+            linewidth=0.5, # original 0.5
             label="Candidate connection")
     end
 
     triangle_marker = Line2D([0], [0], marker="^", color="w", label="Storage sites", markerfacecolor="brown", markersize=8)  # need to use some mathmode otherwise italic text            
-    Storage_capacity_marker = Line2D([0], [0], marker="o", lw=0,  color="grey", label="Storage capacity filled")
-    dashed_line = Line2D([0], [0], linestyle="--", color="grey", lw=1.5, label="Candidate connections")
-    full_line = Line2D([0], [0], linestyle="-", color="mediumseagreen", lw=2, label="Selected connection")
-    capture_marker = Line2D([0], [0], marker="o", lw=0, alpha = 0.5,  color="mediumseagreen",  label="CCS participant")
-    non_capture_marker = Line2D([0], [0], marker="o", lw=0, alpha = 0.5, color="indianred",  label="CCS nonparticipant")
-    emitter_marker = Line2D([0], [0], marker=".", lw=0,  color="black", label="Non-CCS sites (default)")
-    centroids = Line2D([0], [0], marker="x", lw=0,  color="dimgrey", label="Cluster centroids")
-    terminal_marker = Line2D([0], [0], marker="s", lw=0,  color="grey", label="Terminals")
+    Storage_capacity_marker = Line2D([0], [0], markersize=14, marker="o", lw=0, markeredgecolor="black",  color= "white", alpha = 0.5, label="Storage fields") #sm.to_rgba(v_max)
+    dashed_line = Line2D([0], [0],markersize=14, linestyle="--", color="grey", lw=1.5, label="Candidate connections")
+    full_line = Line2D([0], [0], markersize=14,linestyle="-", color="mediumseagreen", lw=2, label="Selected connection")
+    capture_marker = Line2D([0], [0], markersize=14,marker="o", lw=0, alpha = 0.5,  color=sm.to_rgba(v_min),  label="CCS participant")
+    non_capture_marker = Line2D([0], [0], markersize=14,marker="o", lw=0, alpha = 0.5, color="indianred",  label="CCS nonparticipant")
+    emitter_marker = Line2D([0], [0], markersize=14,marker=".", lw=0,  color="black", label="Non-CCS sites (default)")
+    centroids = Line2D([0], [0], markersize=14,marker="x", lw=0,  color="dimgrey", label="Cluster centroids")
+    terminal_marker = Line2D([0], [0],markersize=14, marker="s", lw=0,  color="grey", label="Terminals")
     # Optimal pipelines
     
     for index in 1:length(Pipes_opt_co_na)
@@ -912,22 +953,16 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     filtered_pipe_opt_cap = all_pipe_opt_cap[indices_to_keep]
     filtered_pipe_opt_coordinates = all_pipe_opt_coordinates[indices_to_keep]
     segments = [[(filtered_pipe_opt_coordinates[i][1], filtered_pipe_opt_coordinates[i][3]), (filtered_pipe_opt_coordinates[i][2], filtered_pipe_opt_coordinates[i][4])] for i in 1:length(filtered_pipe_opt_coordinates)] 
-    lc = LineCollection(segments, cmap=cmap_style, norm=plt.Normalize(vmin=0, vmax=v_max), alpha= 0.7, lw=1.5, capstyle="round",   # rounded line ends
+    lc = LineCollection(segments, cmap=cmap_style, norm=plt.Normalize(vmin=0, vmax=v_max), alpha= 0.7, lw=2.2, capstyle="round",   # rounded line ends # original lw = 1.5
     joinstyle="round"   # rounded corners where segments meet
     )
     lc.set_array(filtered_pipe_opt_cap)
-    ax.add_collection(lc)
-
-    cbar = plt.colorbar(lc,ax =ax, label="CO2 network infrastructure",shrink=0.2)
-    #cbar.ax.set_ylabel("Pipe capacity (MtCO2pa)",size=8)
-    cbar.ax.set_ylabel(L"Pipe capacity (MtCO$_2$pa)", size=12)
-    cbar.ax.yaxis.set_tick_params(labelsize=12)
+    
 
     # Clusters 
-    sm = plt.cm.ScalarMappable(cmap=cmap_style, norm=plt.Normalize(vmin=1, vmax=v_max))
-    sm.set_array([])
 
-    Trilateral_area = trilateral["geometry"]
+
+    Trilateral_area = clusters_trilateral["geometry"]
     inside = [any(geom.contains(shpgeo.Point(row.Lon, row.Lat)) for geom in Trilateral_area)
     for row in eachrow(Cluster_coordinates_plot)]
     Clusters_inside = Cluster_coordinates_plot[inside, :]
@@ -935,21 +970,21 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     scatter_plot = plt.scatter(
         Clusters_inside[:,2],
         Clusters_inside[:,1],
-        s=15,
+        s=25, #original: 15
         #label='Target Regions',
         marker = "x",
-        lw=1.0,
+        lw=2.0,
         color="dimgrey"
     )
-
+    # Terminals 
     scatter = plt.scatter(
         Terminal_coordinates[:,2],
         Terminal_coordinates[:,1],
-        s=10,
+        s=20, # original 10
         color="grey",
         marker="s",
     )
-    Industry_connection_results = industry_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     cc_emitter_extract =  Dict(e => try Industry_connection_results[Industry_connection_results[:, "Emitters"] .== e, "Bin_connection"][1] catch skip end for e in EMITTERS)
     
 
@@ -968,11 +1003,11 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     # capture_volume_vect = [TOT_capture_1_CO2[e].*cc_emitter_extract[e] for e in EMITTERS]
 
     capture_volume_vect = [TOT_capture_1_CO2[e] for e in EMITTERS] 
-    min_size = 1
-    max_size = 30 * maximum(capture_volume_vect)
+    min_size = 10 # original: 1
+    max_size = 70 * maximum(capture_volume_vect) # original: 30
     normalised_cc_vol_vect = py"scale_capture_volume"(min_size,max_size,capture_volume_vect)
     normalised_cc_vol_dict = Dict(e => normalised_cc_vol_vect[i] for  (i,e) in enumerate(EMITTERS))
-
+    cc_vol_dict =  Dict(e => capture_volume_vect[i] for  (i,e) in enumerate(EMITTERS))
     #capture_volume_vect_cancelled = [TOT_capture_1_CO2[e].*(1-cc_emitter[e]) for e in EMITTERS]
     # normalised_cc_vol_vect_cancelled_with_NaN= py"scale_capture_volume"(min_size,max_size,capture_volume_vect_cancelled)
     # normalised_cc_vol_vect_cancelled = replace(normalised_cc_vol_vect_cancelled_with_NaN, NaN => 0.0)
@@ -1000,7 +1035,7 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
                 Emitters[e][1],
                 Emitters[e][2],
                 #label='Target Regions',
-                s = 0.5,
+                s = 2, # original: 0.5
                 color="black"
             )
         catch 
@@ -1010,8 +1045,8 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
                 Emitters_captured[e][1],
                 Emitters_captured[e][2],
                 #label='Target Regions',
-                s = 2,
-                color="mediumseagreen"
+                s = 4, #original: 2
+                color=sm.to_rgba(cc_vol_dict[e])
             )
         catch 
         end
@@ -1021,7 +1056,7 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
             Emitters_captured[e][2],
             s=normalised_cc_vol_dict[e],
             #label='Target Regions',
-            color="mediumseagreen",
+            color=sm.to_rgba(cc_vol_dict[e]),
             alpha= 0.5,
         )
         catch 
@@ -1034,7 +1069,7 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
                 Emitters_cancelled[e][1],
                 Emitters_cancelled[e][2],
                 #label='Target Regions',
-                s = 2,
+                s = 4, # original: 2
                 color="indianred"
             )
         catch 
@@ -1059,7 +1094,7 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
         scatter = plt.scatter(
             Non_capture_sites[e][1],
             Non_capture_sites[e][2],
-            s= 2,
+            s= 4, # orginal: 2
             #label='Target Regions',
             color="black",
             alpha= 0.5,
@@ -1069,29 +1104,29 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     end 
 
     # Storage locations
-    scatter = plt.scatter(
-        Storage_offshore_coordinates[:,2],
-        Storage_offshore_coordinates[:,1],
-        s=15,
-        color="brown",
-        marker="^",
-    )
+    # scatter = plt.scatter(
+    #     Storage_offshore_coordinates[:,2],
+    #     Storage_offshore_coordinates[:,1],
+    #     s=30, # original: 15
+    #     color="brown",
+    #     marker="^",
+    # )
 
-    scatter = plt.scatter(
-        Storage_inland_coordinates[:,2],
-        Storage_inland_coordinates[:,1],
-        s=15,
-        color="brown",
-        marker="^",
-    )
+    # scatter = plt.scatter(
+    #     Storage_inland_coordinates[:,2],
+    #     Storage_inland_coordinates[:,1],
+    #     s=30, # original: 15
+    #     color="brown",
+    #     marker="^",
+    # )
 
 
 
-    # storages 
-    max_cap  =  20.0 #maximum(Cluster_capture_summary[!,"Total_capture_potential_sum"])
-    size_scale = 0.2  # you can adjust this to control absolute pie size
-    base_size = 600
-    Storage_summary_df = storage_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    # Storages 
+    max_cap  =  20.0 #maximum(Cluster_capture_summary[!,"Total_capture_potential_sum"]) # original 
+    size_scale = 0.8  # you can adjust this to control absolute pie size # original: 0.2
+    base_size = 1000 # you can adjust this to control absolute pie size # original: 600
+    Storage_summary_df = storage_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     for i in 1:nrow(Storage_summary_df)
         lon = Storage_summary_df.Lon[i]
         lat = Storage_summary_df.Lat[i]
@@ -1108,10 +1143,10 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
         # Compute pie size (relative to total)
         pie_radius = size_scale * sqrt(total / max_cap)
 
-         size = base_size * (total / max_cap)
+        size = base_size * (total / max_cap)
 
         # Call Python function
-        colors_pie = ["grey", "white"]
+        global colors_pie = [sm.to_rgba(Full), "white"]
         py"draw_pie"(sizes, lon, lat, size, ax, colors_pie)
 
 
@@ -1126,10 +1161,9 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
 
 
     # show plot 
+    plt.legend(handles=[dashed_line, full_line, emitter_marker, capture_marker, non_capture_marker, centroids, terminal_marker, Storage_capacity_marker], title_fontsize=6.5, fontsize=18, loc="upper right") #bbox_to_anchor=(0.55,0)
 
 
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
 
     # cbar = plt.colorbar(sm,ax =ax, label="CO2 network infrastructure",shrink=0.2)
 
@@ -1151,24 +1185,61 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     if Region == "Trilateral"
         # ax.set_xlim([1,11])
         # ax.set_ylim([48,60])
-        if (Scenario_name == "Exit" || Scenario_name == "Exit_no_CDR") && Social_decision == true 
+        if (Scenario_name == "CDR_price" || Scenario_name == "Exit_no_CDR") && Social_decision == true 
             ax.set_xlim([1,11])
-            ax.set_ylim([49,57])
+            ax.set_ylim([49.3,57])
+            cax_legpos = [0.78, 0.29, 0.02, 0.2]
+ 
         elseif Social_decision == false 
             ax.set_xlim([1,11])
-            ax.set_ylim([48,61])
+            ax.set_ylim([48.3,61])
+            cax_legpos = [0.78, 0.15, 0.02, 0.2]
+
         else
-            ax.set_xlim([1,11])
-            ax.set_ylim([49,61])
+            if France == true
+                cax_legpos = [0.78, 0.15, 0.02, 0.2]
+                ax.set_xlim([1,11])
+                ax.set_ylim([48.7,61])
+            else
+                if UK_storage == true 
+                    cax_legpos = [0.79, 0.20, 0.02, 0.2]
+                    ax.set_xlim([0,11])
+                    ax.set_ylim([49.3,61])
+                else 
+                    cax_legpos = [0.78, 0.15, 0.02, 0.2]
+                    ax.set_xlim([1,11])
+                    ax.set_ylim([49.3,61])
+                end
+            end
         end
     elseif Region == "Europe"
         ## European 
+        cax_legpos = [0.78, 0.15, 0.02, 0.2]
         ax.set_xlim([-10,25])
         ax.set_ylim([38,60])
     else 
         print("Error - region coordinates not defined")
     end
 
+
+    ax.add_collection(lc)
+    if Scenario_name != "Exit_no_CDR"
+        c_ax = fig.add_axes(cax_legpos)   
+        cbar = plt.colorbar(lc,cax =c_ax, shrink=0.2)
+        vmin, vmax = lc.norm.vmin, lc.norm.vmax
+        vmin_r = Int64(5 * round(vmin / 5))
+        vmax_r =  Int64(round(vmax,digits =0))
+        vmid_r = Int64(5 * round((vmin_r + vmax_r) / 10))
+
+        cbar.set_ticks([vmin_r, vmid_r, vmax_r])
+        #cbar.ax.set_ylabel("Pipe capacity (MtCO2pa)",size=8)
+        cbar.ax.set_ylabel(L"Injection capacity (MtCO$_2$pa)", size=18)
+        cbar.ax.yaxis.set_tick_params(labelsize=18)
+        # ax.set_xlabel("Longitude")
+        # ax.set_ylabel("Latitude")
+    else
+        skip
+    end
 
     # Remove X-axis and Y-axis tick marks (grid lines)
     ax.tick_params(axis="both", which="both", length=0)
@@ -1177,7 +1248,6 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     else
         additional_title_info = "CC max, T&S optimised"
     end
-    plt.legend(handles=[dashed_line, full_line, emitter_marker, capture_marker, non_capture_marker, centroids, terminal_marker, Storage_capacity_marker], title_fontsize=6.5, fontsize=10, loc="upper right") #bbox_to_anchor=(0.55,0)
 
     # Table_parameters = Key_output_df.Parameters
     # Table_values = Key_output_df.Values
@@ -1187,15 +1257,11 @@ function visualisation_pipes(shapefile_eu, Figure_name, title_plot)
     # plt.subplots_adjust(bottom=0.3)
 
     plt.title("", pad=25,fontsize=14)
-    plt.tight_layout()
+    #plt.tight_layout()
     if MPEC == true 
-        save_path = "./Figures/MPEC/$(Figure_name)_$(Subcase_name).svg"
-    elseif Social_decision == false 
-        save_path = "./Figures/Max connectivity/Max_$(Figure_name).svg"
-    elseif Tariff == true 
-        save_path = "./Figures/Tariff/$(Figure_name).svg"
+        save_path = "./Figures/MPEC/$(Scenario_name)_$(CO2_tax)_$(Subcase_name).svg"
     else
-        save_path = "./Figures/Base/$(Figure_name).svg"
+        save_path = "./Figures/Base/$(Scenario_name)_$(CO2_tax)_$(Subcase_name).svg"
     end
 
     plt.savefig(save_path, bbox_inches="tight")
@@ -1229,7 +1295,7 @@ function preOpt_visualisation_py(shapefile_eu)
         # Regions
 
         # trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") # no provinces
-        non_trilateral_2.plot(ax=ax, color="whitesmoke", edgecolor="none", zorder=0)
+        non_trilateral_2.plot(ax=ax, color="lightgrey", edgecolor="none", zorder=0)
         borders_NRW.plot(ax=ax, color="white", edgecolor="none", zorder=0)
         # Regions
         trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") #  provinces
@@ -1254,8 +1320,8 @@ function preOpt_visualisation_py(shapefile_eu)
     Intercept = true  # True: binary variables for pipeline investments, false: no binary parameters for pipeline investments 
     global Costs, Routing_nodes_all, Pipelines_all, Terminals, Storage_offshore, Storage_inland, Offshore_nodes, Clusters = import_data_TandS(system_data_file) 
     include("parameters.jl")    # run all the parameters of the script 
-    global Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(results_pipes_Trilateral_file_HPC::String, Scenario_name::String, Region::String, CO2_tax::Int64)
-    global Industry_connection_results = industry_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    global Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
+    global Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
 
     capacity_cutout = 0.008
     cmap_style = "winter_r"
@@ -1265,30 +1331,18 @@ function preOpt_visualisation_py(shapefile_eu)
 
 
 
-    for pipe in Pipe_coordinates
-        plt.plot(
-            [pipe[1,1], pipe[2,1]],
-            [pipe[1,2], pipe[2,2]],
-            "--",  # Dashed line for candidate connections
-            color="dimgrey",
-            alpha = 0.5, 
-            linewidth=0.5,
-            label="Candidate connection")
-    end
-
-
-    triangle_marker = Line2D([0], [0], marker="^", color="w", label="Underground storage sites", markerfacecolor="brown", markersize=8)              
+    triangle_marker = Line2D([0], [0], marker="o", lw=0, markeredgecolor="black", label="Geological storage", markerfacecolor="white", markersize=8)              
     dashed_line = Line2D([0], [0], linestyle="--", color="grey", lw=1.5, label="Candidate connection")
     full_line = Line2D([0], [0], linestyle="-", color="mediumseagreen", lw=2, label="Selected connection")
     capture_marker = Line2D([0], [0], marker="o", lw=0, alpha = 0.5,  color="mediumseagreen",  label="CCS participant")
     non_capture_marker = Line2D([0], [0], marker="o", lw=0, alpha = 0.5, color="indianred",  label="CCS nonparticipant")
-    emitter_marker = Line2D([0], [0], marker=".", lw=0,  color="black", label="Non-CCS sites (default)")
-    chemical_emitters = Line2D([0], [0], marker=".", lw=0,  color="chocolate", label="Chemicals (Olefins, PE, PEA)")
-    fertiliser_emitters = Line2D([0], [0], marker=".", lw=0,  color="goldenrod", label="Fertiliser (ammonia, urea, nitric acid)")
-    refinery_emitters = Line2D([0], [0], marker=".", lw=0,  color="darkred", label="Refineries")
-    steel_emitters = Line2D([0], [0], marker=".", lw=0,  color="limegreen", label="Steel (primary, secondary)")
-    cement_emitters = Line2D([0], [0], marker=".", lw=0,  color="darkblue", label="Cement")
-    glass_emitters = Line2D([0], [0], marker=".", lw=0,  color="mediumvioletred", label="Glass")
+    emitter_marker = Line2D([0], [0], marker=".", lw=0,  color="black", label="Emitter (all)")
+    chemical_emitters = Line2D([0], [0], marker="o", lw=0,  color="chocolate", label="Chemicals (Olefins, PE, PEA)")
+    fertiliser_emitters = Line2D([0], [0], marker="s", lw=0,  color="goldenrod", label="Fertiliser (ammonia, urea, nitric acid)")
+    refinery_emitters = Line2D([0], [0], marker="P", lw=0,  color="darkred", label="Refineries")
+    steel_emitters = Line2D([0], [0], marker="v", lw=0,  color="limegreen", label="Steel (primary, secondary)")
+    cement_emitters = Line2D([0], [0], marker="d", lw=0,  color="darkblue", label="Cement")
+    glass_emitters = Line2D([0], [0], marker="^", lw=0,  color="mediumvioletred", label="Glass")
 
     terminal_marker = Line2D([0], [0], marker="s", lw=0,  color="grey", label="Terminals")
     centroids = Line2D([0], [0], marker="x", lw=0,  color="dimgrey", label="Cluster entroids")
@@ -1301,21 +1355,58 @@ function preOpt_visualisation_py(shapefile_eu)
     sm.set_array([])
 
     # Storage locations
-    scatter = plt.scatter(
-        Storage_offshore_coordinates[:,2],
-        Storage_offshore_coordinates[:,1],
-        s=15,
-        color="brown",
-        marker="^",
-    )
+    # scatter = plt.scatter(
+    #     Storage_offshore_coordinates[:,2],
+    #     Storage_offshore_coordinates[:,1],
+    #     s=15,
+    #     color="brown",
+    #     marker="^",
+    # )
 
-    scatter = plt.scatter(
-        Storage_inland_coordinates[:,2],
-        Storage_inland_coordinates[:,1],
-        s=15,
-        color="brown",
-        marker="^",
-    )
+    # scatter = plt.scatter(
+    #     Storage_inland_coordinates[:,2],
+    #     Storage_inland_coordinates[:,1],
+    #     s=15,
+    #     color="brown",
+    #     marker="^",
+    # )
+
+     max_cap  =  20.0 #maximum(Cluster_capture_summary[!,"Total_capture_potential_sum"]) # original 
+    size_scale = 0.8  # you can adjust this to control absolute pie size # original: 0.2
+    base_size = 1000 # you can adjust this to control absolute pie size # original: 600
+    Storage_summary_df = storage_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
+    for i in 1:nrow(Storage_summary_df)
+        lon = Storage_summary_df.Lon[i]
+        lat = Storage_summary_df.Lat[i]
+        
+        Full = 0.0
+        Empty = Storage_summary_df.Theoretical_volume_mt[i]./Storage_periods - Storage_summary_df.Stored_vol_node_origin[i]
+        sizes = [0.0, Empty]
+        total = sum(sizes)
+        if total == 0
+            continue  # skip empty pies
+        end
+
+
+        # Compute pie size (relative to total)
+        pie_radius = size_scale * sqrt(total / max_cap)
+
+        size = base_size * (total / max_cap)
+
+        # Call Python function
+        global colors_pie = ["white", "white"]
+        py"draw_pie"(sizes, lon, lat, size, ax, colors_pie)
+
+
+
+        # # Create new inset axes at cluster location
+        # bbox = [lon - pie_radius, lat - pie_radius, 2*pie_radius, 2*pie_radius]
+        # inset_ax = fig.add_axes(bbox, transform=ax[2].transData, zorder=5)  # Data-coord inset
+        # inset_ax.pie(sizes, colors=["green", "brown", "indianred"])
+        # inset_ax.set_aspect("equal")
+        # inset_ax.axis("off")
+    end
+
 
     scatter = plt.scatter(
         Terminal_coordinates[:,2],
@@ -1347,6 +1438,7 @@ function preOpt_visualisation_py(shapefile_eu)
             Chemical_emitters[Chemical_emitters[:, "Emitter_id"] .== e, "Lat"],
             #label='Target Regions',
             s = 8,
+            marker="o", 
             color="chocolate"
         )
     end 
@@ -1356,6 +1448,7 @@ function preOpt_visualisation_py(shapefile_eu)
             Fertilisers_emitters[Fertilisers_emitters[:, "Emitter_id"] .== e, "Lat"],
             #label='Target Regions',
             s = 8,
+            marker="s", 
             color="goldenrod"
         )
     end 
@@ -1365,6 +1458,7 @@ function preOpt_visualisation_py(shapefile_eu)
             Refineries_emitters[Refineries_emitters[:, "Emitter_id"] .== e, "Lat"],
             #label='Target Regions',
             s = 8,
+            marker="P", 
             color="darkred"
         )
     end
@@ -1375,6 +1469,7 @@ function preOpt_visualisation_py(shapefile_eu)
             Cement_emitters[Cement_emitters[:, "Emitter_id"] .== e, "Lat"],
             #label='Target Regions',
             s = 8,
+            marker="d", 
             color="darkblue"
         )
     end 
@@ -1385,6 +1480,7 @@ function preOpt_visualisation_py(shapefile_eu)
             Steel_emitters[Steel_emitters[:, "Emitter_id"] .== e, "Lat"],
             #label='Target Regions',
             s = 8,
+            marker="v", 
             color="limegreen"
         )
     end 
@@ -1395,6 +1491,7 @@ function preOpt_visualisation_py(shapefile_eu)
             Glass_emitters[Glass_emitters[:, "Emitter_id"] .== e, "Lat"],
             #label='Target Regions',
             s = 8,
+            marker="^", 
             color="mediumvioletred"
         )
     end 
@@ -1410,6 +1507,20 @@ function preOpt_visualisation_py(shapefile_eu)
     end 
 
     
+
+    for (i,pipe) in enumerate(Pipe_coordinates)
+        plt.plot(
+            [pipe[1,1], pipe[2,1]],
+            [pipe[1,2], pipe[2,2]],
+            "--",  # Dashed line for candidate connections
+            color="dimgrey",
+            alpha = 0.5, 
+            linewidth=0.5,
+            label="Candidate connection")
+        # plt.annotate(Pipe_id[i][1], (pipe[1,1],pipe[1,2]), textcoords = "offset points", xytext = (1,1), ha="center", color = "black")
+        # plt.annotate(Pipe_id[i][2], (pipe[2,1],pipe[2,2]), textcoords = "offset points", xytext = (1,1), ha="center", color = "black") 
+    end
+
 
 
 #     Terminal_id = string.(Terminals[!, "Node_id"])
@@ -1482,9 +1593,9 @@ end
 
 function visualisation_capture_clusters(Scenario_name::String, CDR_effect::Bool, Legend::Bool)
 
-    Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(results_pipes_Trilateral_file_HPC::String, Scenario_name::String, Region::String, CO2_tax::Int64)
+    Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     # scenario_title = Scenario_title_vect[i]
-    global Industry_connection_results = industry_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    global Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     global cc_emitter_extract =  Dict(e => try Industry_connection_results[Industry_connection_results[:, "Emitters"] .== e, "Bin_connection"][1] catch skip end for e in EMITTERS)
     
 
@@ -1494,19 +1605,23 @@ function visualisation_capture_clusters(Scenario_name::String, CDR_effect::Bool,
 
 
     if Region == "Trilateral"
-        trilateral= py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
+       trilateral= py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
+        clusters_trilateral = trilateral
         borders = py"geo_coverage"(NUTS_level=0,codes=["NL","BE","DEA"],shapefile =shapefile_eu)
         non_trilateral= py"geo_coverage"(NUTS_level=2,codes=["FR","DE"],shapefile =shapefile_eu)
-        other_borders = py"geo_coverage"(NUTS_level=0,codes=["FR","DE"],shapefile =shapefile_eu)
+        non_trilateral_2= py"geo_coverage"(NUTS_level=2,codes=["FR","DE", "NO", "SE", "DK", "LU"],shapefile =shapefile_eu)
+        other_borders = py"geo_coverage"(NUTS_level=0,codes=["FR","DE", "NO", "DK", "SE"],shapefile =shapefile_eu)
         borders_NRW = py"geo_coverage"(NUTS_level=1,codes=["DEA"],shapefile =shapefile_eu)
 
         # Regions
-        #trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black")
-        borders.boundary.plot(ax=ax, linewidth=0.7,color="black")
-        #non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
-        other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
-        borders_NRW.boundary.plot(ax=ax, linewidth=0.7,color="black")
+        # trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") # no provinces
+        non_trilateral_2.plot(ax=ax, color="lightgrey", edgecolor="none", zorder=0)
+        borders_NRW.plot(ax=ax, color="white", edgecolor="none", zorder=0)
 
+        borders.boundary.plot(ax=ax, linewidth=0.9,color="black")
+        # non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
+        other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
+        borders_NRW.boundary.plot(ax=ax, linewidth=0.9,color="black")
    
 
     elseif Region == "Europe"
@@ -1560,7 +1675,7 @@ function visualisation_capture_clusters(Scenario_name::String, CDR_effect::Bool,
 
 
      # storages 
-    Storage_summary_df = storage_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    Storage_summary_df = storage_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     for i in 1:nrow(Storage_summary_df)
         lon = Storage_summary_df.Lon[i]
         lat = Storage_summary_df.Lat[i]
@@ -1686,14 +1801,14 @@ function visualisation_capture_clusters(Scenario_name::String, CDR_effect::Bool,
 
         # if MPEC .== true
         #     DF_sankey_Trilateral = sankey_2_scenario_change_py(results_industry_Trilateral_file_HPC, (Scenario_name_1 = "CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Figure_name = "$(Region)_sankey_py"; Figure_name), (Plotting = false; Plotting))
-        #     Fossil_CC_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .== "Fossil") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Bio + CC"), :]
-        #     CC_fossil_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .== "Fossil + CC") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Electric"), :]
+        #     Fossil_CC_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .== "Fossil") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Bio + CCS"), :]
+        #     CC_fossil_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .== "Fossil + CCS") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Electric"), :]
         # else
-            DF_sankey_Trilateral = sankey_2_scenario_change_py(results_industry_Trilateral_file_HPC, (Scenario_name_1 = "No_CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Figure_name = "$(Region)_sankey_py"; Figure_name), (Plotting = false; Plotting))
-            Fossil_CC_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil + CC") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil + CC"), :]
+            DF_sankey_Trilateral = sankey_2_scenario_change_py((Scenario_name_1 = "No_CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Plotting = false; Plotting))
+            Fossil_CC_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil + CCS") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil + CCS"), :]
             CC_fossil_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil"), :]
         # end
-            Fossil_CC_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil + CC") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil + CC"), :]
+            Fossil_CC_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil + CCS") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil + CCS"), :]
             CC_fossil_trans = DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Electric") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Electric"), :]
     
 
@@ -1977,7 +2092,7 @@ function visualisation_CDR_effect()
         color="grey",
         marker="s",
     )
-    Industry_connection_results = industry_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     cc_emitter_extract =  Dict(e => try Industry_connection_results[Industry_connection_results[:, "Emitters"] .== e, "Bin_connection"][1] catch skip end for e in EMITTERS)
     
 
@@ -2228,7 +2343,7 @@ function visualisation_CDR_effect()
 
 
     DF_sankey_Trilateral = sankey_2_scenario_change_py(results_industry_Trilateral_file_HPC, (Scenario_name_1 = "No_CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Figure_name = "$(Region)_sankey_py"; Figure_name), (Plotting = false; Plotting))
-    DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil + CC") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil + CC"), :]
+    DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil + CCS") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil + CCS"), :]
     DF_sankey_Trilateral[(DF_sankey_Trilateral[:, "Scenario_1"] .!= "Fossil") .&& (DF_sankey_Trilateral[:, "Scenario_2"] .== "Fossil"), :]
 
 
@@ -2282,13 +2397,13 @@ function visualisation_CDR_effect()
     plt.title("", pad=25,fontsize=14)
     # plt.tight_layout()
     if MPEC == true 
-        save_path = "./Figures/MPEC/$(Figure_name)_$(Subcase_name).svg"
+        save_path = "./Figures/MPEC/$(Scenario_name)_$(Subcase_name)_CDR.svg"
     elseif Social_decision == false 
-        save_path = "./Figures/Max connectivity/$(Figure_name).svg"
+        save_path = "./Figures/Max connectivity/$(Scenario_name)_$(Subcase_name)_CDR.svg"
     elseif Tariff == true 
-        save_path = "./Figures/Tariff/$(Figure_name).svg"
+        save_path = "./Figures/Tariff/$(Scenario_name)_$(Subcase_name)_CDR.svg"
     else
-        save_path = "./Figures/Base/$(Figure_name).svg"
+        save_path = "./Figures/Base/$(Scenario_name)_$(Subcase_name)_CDR.svg"
     end
 
     plt.savefig(save_path, bbox_inches="tight")
@@ -2299,4 +2414,405 @@ function visualisation_CDR_effect()
 
 return 
 
+end
+
+
+
+function visualisation_pipes_FR(shapefile_eu, Scenario_name, Scenario_horizon)
+
+
+    # Plotting
+
+    fig, ax = plt.subplots(figsize=(8, 16))
+    divider = make_axes_locatable(ax)
+    
+
+    if Region == "Trilateral"
+        trilateral= py"geo_coverage"(NUTS_level=2,codes=["NL","BE","DEA","FRE1","FRE2"],shapefile =shapefile_eu)
+        borders = py"geo_coverage"(NUTS_level=0,codes=["NL","BE","DEA","FRE1","FRE2"],shapefile =shapefile_eu)
+        non_trilateral= py"geo_coverage"(NUTS_level=2,codes=["FR","DE"],shapefile =shapefile_eu)
+        non_trilateral_2= py"geo_coverage"(NUTS_level=2,codes=["FR","DE", "NO", "SE", "DK", "LU"],shapefile =shapefile_eu)
+        other_borders = py"geo_coverage"(NUTS_level=0,codes=["FR","DE", "NO", "DK", "SE"],shapefile =shapefile_eu)
+        borders_NRW = py"geo_coverage"(NUTS_level=1,codes=["DEA", "FRE"],shapefile =shapefile_eu)
+
+        # Regions
+        # trilateral.boundary.plot(ax=ax, linewidth=0.2,color="black") # no provinces
+        non_trilateral_2.plot(ax=ax, color="whitesmoke", edgecolor="none", zorder=0)
+        borders_NRW.plot(ax=ax, color="white", edgecolor="none", zorder=0)
+
+        borders.boundary.plot(ax=ax, linewidth=0.7,color="black")
+        # non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
+        other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
+        borders_NRW.boundary.plot(ax=ax, linewidth=0.7,color="black")
+
+    elseif Region == "Europe"
+        NUTS_ = gpd.read_file(shapefile_eu)
+        non_trilateral= py"geo_coverage"(NUTS_level=2,codes=unique(NUTS_["CNTR_CODE"]),shapefile =shapefile_eu)
+        other_borders = py"geo_coverage"(NUTS_level=0,codes=unique(NUTS_["CNTR_CODE"]),shapefile =shapefile_eu)
+
+        non_trilateral.boundary.plot(ax=ax, linewidth=0.2,color="grey")
+        other_borders.boundary.plot(ax=ax, linewidth=0.3,color="grey")
+
+    else
+    end
+
+
+
+
+
+
+    # Candidate Pipelines
+        
+    system_data_file =   eval(Symbol("system_data_file_", detail_level))
+    Intercept = true  # True: binary variables for pipeline investments, false: no binary parameters for pipeline investments 
+    global Costs, Routing_nodes_all, Pipelines_all, Terminals, Storage_offshore, Storage_inland, Offshore_nodes, Clusters = import_data_TandS(system_data_file) 
+    include("parameters.jl")    # run all the parameters of the script 
+    global Pipes_opt_co_na, Pipes_opt_sizes = pipeline_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
+    # scenario_title = Scenario_title_vect[i]
+    global Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String,CO2_tax)
+
+    capacity_cutout = 0.008
+    cmap_style = "winter_r"
+    v_min = 1
+    try 
+        global v_max =  maximum(Pipes_opt_sizes) # 250
+    catch 
+        global v_max = v_min
+    end
+
+
+    for pipe in Pipe_coordinates
+        plt.plot(
+            [pipe[1,1], pipe[2,1]],
+            [pipe[1,2], pipe[2,2]],
+            "--",  # Dashed line for candidate connections
+            color="dimgrey",
+            alpha = 0.5, 
+            linewidth=0.5,
+            label="Candidate connection")
+    end
+
+    triangle_marker = Line2D([0], [0], marker="^", color="w", label="Storage sites", markerfacecolor="brown", markersize=8)  # need to use some mathmode otherwise italic text            
+    Storage_capacity_marker = Line2D([0], [0], marker="o", lw=0,  color="grey", label="Storage capacity filled")
+    dashed_line = Line2D([0], [0], linestyle="--", color="grey", lw=1.5, label="Candidate connections")
+    full_line = Line2D([0], [0], linestyle="-", color="mediumseagreen", lw=2, label="Selected connection")
+    capture_marker = Line2D([0], [0], marker="o", lw=0, alpha = 0.5,  color="mediumseagreen",  label="CCS participant")
+    non_capture_marker = Line2D([0], [0], marker="o", lw=0, alpha = 0.5, color="indianred",  label="CCS nonparticipant")
+    emitter_marker = Line2D([0], [0], marker=".", lw=0,  color="black", label="Non-CCS sites (default)")
+    centroids = Line2D([0], [0], marker="x", lw=0,  color="dimgrey", label="Cluster centroids")
+    terminal_marker = Line2D([0], [0], marker="s", lw=0,  color="grey", label="Terminals")
+    # Optimal pipelines
+    
+    for index in 1:length(Pipes_opt_co_na)
+        pipe_opt_coordinates = values.(Pipes_opt_co_na)[index][:]
+        pipe_opt_cap = values.(Pipes_opt_sizes)[index]
+        # arrow = FancyArrowPatch(
+        #     (pipe_opt_coordinates[1], pipe_opt_coordinates[3]),
+        #     (pipe_opt_coordinates[2], pipe_opt_coordinates[4]),
+        #     arrowstyle="-",
+        #     mutation_scale=20.0, # 12
+        #     color=py"getattr"(plt.cm,cmap_style)(pipe_opt_cap / v_max),  # Use 'viridis_r' colormap
+        #     alpha=0.7,
+        #     lw=2 #,         transform=ax.transData,
+        # )
+        # ax.add_patch(arrow) #https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.ConnectionStyle.html#matplotlib.patches.ConnectionStyle
+
+   
+    end
+
+    all_pipe_opt_coordinates = values.(Pipes_opt_co_na)[:][:];
+    all_pipe_opt_cap = values.(Pipes_opt_sizes)[:]
+    indices_to_keep = findall(x -> x >= 0.0, all_pipe_opt_cap)
+    filtered_pipe_opt_cap = all_pipe_opt_cap[indices_to_keep]
+    filtered_pipe_opt_coordinates = all_pipe_opt_coordinates[indices_to_keep]
+    segments = [[(filtered_pipe_opt_coordinates[i][1], filtered_pipe_opt_coordinates[i][3]), (filtered_pipe_opt_coordinates[i][2], filtered_pipe_opt_coordinates[i][4])] for i in 1:length(filtered_pipe_opt_coordinates)] 
+    lc = LineCollection(segments, cmap=cmap_style, norm=plt.Normalize(vmin=0, vmax=v_max), alpha= 0.7, lw=1.5, capstyle="round",   # rounded line ends
+    joinstyle="round"   # rounded corners where segments meet
+    )
+    lc.set_array(filtered_pipe_opt_cap)
+    ax.add_collection(lc)
+
+    cbar = plt.colorbar(lc,ax =ax, label="CO2 network infrastructure",shrink=0.2)
+    #cbar.ax.set_ylabel("Pipe capacity (MtCO2pa)",size=8)
+    cbar.ax.set_ylabel(L"Pipe capacity (MtCO$_2$pa)", size=12)
+    cbar.ax.yaxis.set_tick_params(labelsize=12)
+
+    # Clusters 
+    sm = plt.cm.ScalarMappable(cmap=cmap_style, norm=plt.Normalize(vmin=1, vmax=v_max))
+    sm.set_array([])
+
+    Trilateral_area = trilateral["geometry"]
+    inside = [any(geom.contains(shpgeo.Point(row.Lon, row.Lat)) for geom in Trilateral_area)
+    for row in eachrow(Cluster_coordinates_plot)]
+    Clusters_inside = Cluster_coordinates_plot[inside, :]
+
+    scatter_plot = plt.scatter(
+        Clusters_inside[:,2],
+        Clusters_inside[:,1],
+        s=15,
+        #label='Target Regions',
+        marker = "x",
+        lw=1.0,
+        color="dimgrey"
+    )
+
+    scatter = plt.scatter(
+        Terminal_coordinates[:,2],
+        Terminal_coordinates[:,1],
+        s=10,
+        color="grey",
+        marker="s",
+    )
+    Industry_connection_results = industry_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax)
+    cc_emitter_extract =  Dict(e => try Industry_connection_results[Industry_connection_results[:, "Emitters"] .== e, "Bin_connection"][1] catch skip end for e in EMITTERS)
+    
+
+    # Emitters 
+    capture_volume_dict = Dict(e => TOT_capture_1_CO2[e].*cc_emitter_extract[e] for e in EMITTERS)
+    Emitters_modelled = Dict(e =>  (Emitters[Emitters[:,"Emitter_id"] .==e, "Lon"][1],  Emitters[Emitters[:,"Emitter_id"] .==e, "Lat"][1]) for e in EMITTERS)
+    # filtered_emitters = filter(kv -> kv[2] != (0, 0), Emitters_modelled)
+    Emitters_captured = Dict(e => Emitters_modelled[e] for e in EMITTERS if cc_emitter_extract[e] != 0)
+    Emitters_cancelled = Dict(e => Emitters_modelled[e] for e in EMITTERS if(cc_emitter_extract[e] == 0) &(TOT_capture_1_CO2[e] != 0))
+    Emitters_cancelled_names = [Emitters[Emitters[:,"Emitter_id"] .==k, "Product_route_name"][1] for (k, v) in zip(keys(Emitters_cancelled),Emitters_cancelled)]
+    Non_capture_sites = Dict(e => Emitters_modelled[e] for e in EMITTERS if TOT_capture_1_CO2[e] == 0)
+
+    
+
+
+    # capture_volume_vect = [TOT_capture_1_CO2[e].*cc_emitter_extract[e] for e in EMITTERS]
+
+    capture_volume_vect = [TOT_capture_1_CO2[e] for e in EMITTERS] 
+    min_size = 1
+    max_size = 30 * maximum(capture_volume_vect)
+    normalised_cc_vol_vect = py"scale_capture_volume"(min_size,max_size,capture_volume_vect)
+    normalised_cc_vol_dict = Dict(e => normalised_cc_vol_vect[i] for  (i,e) in enumerate(EMITTERS))
+
+    #capture_volume_vect_cancelled = [TOT_capture_1_CO2[e].*(1-cc_emitter[e]) for e in EMITTERS]
+    # normalised_cc_vol_vect_cancelled_with_NaN= py"scale_capture_volume"(min_size,max_size,capture_volume_vect_cancelled)
+    # normalised_cc_vol_vect_cancelled = replace(normalised_cc_vol_vect_cancelled_with_NaN, NaN => 0.0)
+
+    normalised_cc_vol_dict_cancelled = Dict(e => normalised_cc_vol_vect[i] for  (i,e) in enumerate(EMITTERS))
+
+
+
+    # capturing emitters 
+    # all emitters
+    # for e in 1:length(Emitters[:, "Emitter_id"])
+    #     scatter = plt.scatter(
+    #         Emitters[e, "Lon"],
+    #         Emitters[e, "Lat"],
+    #         #label='Target Regions',
+    #         s = 0.5,
+    #         color="black"
+    #     )
+    # end 
+
+    
+    for e in EMITTERS
+        try # All emitters trilateral region
+            scatter = plt.scatter(
+                Emitters[e][1],
+                Emitters[e][2],
+                #label='Target Regions',
+                s = 0.5,
+                color="black"
+            )
+        catch 
+        end
+        try # Assigning green color to all connected carbon capture sites 
+            scatter = plt.scatter(
+                Emitters_captured[e][1],
+                Emitters_captured[e][2],
+                #label='Target Regions',
+                s = 2,
+                color="mediumseagreen"
+            )
+        catch 
+        end
+        try # Assigning green color size to all sites 
+        scatter = plt.scatter(
+            Emitters_captured[e][1],
+            Emitters_captured[e][2],
+            s=normalised_cc_vol_dict[e],
+            #label='Target Regions',
+            color="mediumseagreen",
+            alpha= 0.5,
+        )
+        catch 
+        end
+
+    end
+    for e in EMITTERS
+        try # Assigning red color to all cancelled carbon capture sites 
+            scatter = plt.scatter(
+                Emitters_cancelled[e][1],
+                Emitters_cancelled[e][2],
+                #label='Target Regions',
+                s = 2,
+                color="indianred"
+            )
+        catch 
+        end
+
+        try # assigning red color to all disconnected carbon capture sites 
+        scatter = plt.scatter(
+            Emitters_cancelled[e][1],
+            Emitters_cancelled[e][2],
+            s=normalised_cc_vol_dict_cancelled[e],
+            #label='Target Regions',
+            color="indianred",
+            alpha= 0.5,
+        )
+        # if e == "E2574"
+        #      plt.annotate(e, (Emitters_cancelled[e][1], Emitters_cancelled[e][2]), textcoords = "offset points", xytext = (5,5), ha="center")
+        # end
+        catch 
+        end
+
+        try # assigning blue color to all no carbon capture sites
+        scatter = plt.scatter(
+            Non_capture_sites[e][1],
+            Non_capture_sites[e][2],
+            s= 2,
+            #label='Target Regions',
+            color="black",
+            alpha= 0.5,
+        )
+        catch 
+        end
+    end 
+
+    # Storage locations
+    # scatter = plt.scatter(
+    #     Storage_offshore_coordinates[:,2],
+    #     Storage_offshore_coordinates[:,1],
+    #     s=15,
+    #     color="brown",
+    #     marker="^",
+    # )
+
+    # scatter = plt.scatter(
+    #     Storage_inland_coordinates[:,2],
+    #     Storage_inland_coordinates[:,1],
+    #     s=15,
+    #     color="brown",
+    #     marker="^",
+    # )
+
+
+
+    # storages 
+    max_cap  =  20.0 #maximum(Cluster_capture_summary[!,"Total_capture_potential_sum"])
+    size_scale = 0.2  # you can adjust this to control absolute pie size
+    base_size = 600
+    Storage_summary_df = storage_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax)
+    for i in 1:nrow(Storage_summary_df)
+        lon = Storage_summary_df.Lon[i]
+        lat = Storage_summary_df.Lat[i]
+        
+        Full = Storage_summary_df.Stored_vol_node_origin[i]
+        Empty = Storage_summary_df.Theoretical_volume_mt[i]./Storage_periods - Storage_summary_df.Stored_vol_node_origin[i]
+        sizes = [Full, Empty]
+        total = sum(sizes)
+        if total == 0
+            continue  # skip empty pies
+        end
+
+
+        # Compute pie size (relative to total)
+        pie_radius = size_scale * sqrt(total / max_cap)
+
+         size = base_size * (total / max_cap)
+
+        # Call Python function
+        colors_pie = ["grey", "white"]
+        py"draw_pie"(sizes, lon, lat, size, ax, colors_pie)
+
+
+
+        # # Create new inset axes at cluster location
+        # bbox = [lon - pie_radius, lat - pie_radius, 2*pie_radius, 2*pie_radius]
+        # inset_ax = fig.add_axes(bbox, transform=ax[2].transData, zorder=5)  # Data-coord inset
+        # inset_ax.pie(sizes, colors=["green", "brown", "indianred"])
+        # inset_ax.set_aspect("equal")
+        # inset_ax.axis("off")
+    end
+
+
+    # show plot 
+
+
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+
+    # cbar = plt.colorbar(sm,ax =ax, label="CO2 network infrastructure",shrink=0.2)
+
+    ax.spines["top"].set_visible(false)    # Remove top border
+    ax.spines["right"].set_visible(false)  # Remove right border
+    ax.spines["bottom"].set_visible(false) # Remove bottom border
+    ax.spines["left"].set_visible(false)   # Remove left border
+
+    ax.set_xlabel("")  # Remove X-axis title
+    ax.set_ylabel("")  # Remove Y-axis title
+
+    # Remove X-axis and Y-axis tick labels
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+    # Axis limits 
+    ## Regional 
+    if Region == "Trilateral"
+        # ax.set_xlim([1,11])
+        # ax.set_ylim([48,60])
+        if (Scenario_name == "Exit" || Scenario_name == "Exit_no_CDR") && Social_decision == true 
+            ax.set_xlim([1,11])
+            ax.set_ylim([49,57])
+        elseif Social_decision == false 
+            ax.set_xlim([1,11])
+            ax.set_ylim([48,61])
+        else
+            ax.set_xlim([0,11])
+            ax.set_ylim([49,61])
+        end
+    elseif Region == "Europe"
+        ## European 
+        ax.set_xlim([-10,25])
+        ax.set_ylim([38,60])
+    else 
+        print("Error - region coordinates not defined")
+    end
+
+
+    # Remove X-axis and Y-axis tick marks (grid lines)
+    ax.tick_params(axis="both", which="both", length=0)
+    if Social_decision == true
+        additional_title_info = "CC, T&S optimised"
+    else
+        additional_title_info = "CC max, T&S optimised"
+    end
+    plt.legend(handles=[dashed_line, full_line, emitter_marker, capture_marker, non_capture_marker, centroids, terminal_marker, Storage_capacity_marker], title_fontsize=6.5, fontsize=15, loc="upper right") #bbox_to_anchor=(0.55,0)
+
+    # Table_parameters = Key_output_df.Parameters
+    # Table_values = Key_output_df.Values
+    # Table_units = Key_output_df.Unit
+    # Table_matrix = hcat(Table_parameters, Table_values, Table_units)
+    # plt.table(cellText=Table_matrix, colLabels=["Parameter", "Value", "Unit"], loc="bottom", cellLoc="center")
+    # plt.subplots_adjust(bottom=0.3)
+
+    plt.title("", pad=25,fontsize=14)
+    plt.tight_layout()
+    if MPEC == true 
+        save_path = "./Figures/MPEC/$(Scenario_name)_$(CO2_tax)_$(Subcase_name).svg"
+    else
+        save_path = "./Figures/Base/$(Scenario_name)_$(CO2_tax)_$(Subcase_name).svg"
+    end
+
+    plt.savefig(save_path, bbox_inches="tight")
+
+
+
+
+    # plt.show()
+return     # plt.show()
 end

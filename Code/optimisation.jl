@@ -32,7 +32,8 @@ function initiate_optimal_coordination_model(model, Social_decision, Tariff, Int
     q_inj_off = model.ext[:variables][:q_inj_off] =    JuMP.@variable(model, q_inj_off[STORAGES_OFF] >= 0)
     q_inj_inl = model.ext[:variables][:q_inj_inl] =     JuMP.@variable(model, q_inj_inl[STORAGES_INL] >= 0)
     TOT_capture_cluster = model.ext[:variables][:TOT_capture_cluster] =     JuMP.@variable(model, TOT_capture_cluster[CLUSTERS] >= 0)
-    Scaling_ccts = 2.0              # indicates how many times T&S, CC is more expensive in relation to the initial data 
+    # Scaling_ccts = 2.0              # indicates how many times T&S, CC is more expensive in relation to the initial data 
+
     c_operator = model.ext[:variables][:c_operator] =     JuMP.@variable(model, c_operator >= 0)
     c_transport = model.ext[:variables][:c_transport] =     JuMP.@variable(model, c_transport >= 0)
     c_booster_pump = model.ext[:variables][:c_booster_pump] =     JuMP.@variable(model, c_booster_pump >= 0)
@@ -150,8 +151,11 @@ function initiate_optimal_coordination_model(model, Social_decision, Tariff, Int
     # Constraint 3: constraint to make sure that all transported CO2 ends up in a storage location: destination node l 
     # @constraint(model, 
     # sum( cc_emitter[n]*(TOT_bio_CO2[n]+TOT_fossil_CO2[n]) for n in EMITTERS) == sum((q_pipe_pos[pc, l] + q_pipe_neg[pc, l]) for l in SPIPES, pc in PIECES))
-    
-    
+    # # NO Antwerp diest connection
+    #  @constraint(model, q_pipe_pos[1, ("C20", "C18")] ==0.0)
+    #  @constraint(model, q_pipe_neg[1, ("C20", "C18")] ==0.0)
+
+
     # The below constraint is needed
     @constraint(model, 
     sum( TOT_capture_cluster[c] for c in CLUSTERS) == sum(q_inj_off[n] for n in STORAGES_OFF) + sum(q_inj_inl[n] for n in STORAGES_INL))
@@ -192,13 +196,11 @@ function initiate_optimal_coordination_model(model, Social_decision, Tariff, Int
     # Capital and O&M cost of pipeline
     c_operator
     .-  #trade off with emitter
-    sum(cc_emitter[n].*((CAPEX_noCC[n] .+ OPEX_noCC[n]) .- (CAPEX_1[n] .+ OPEX_1[n])) for n in EMITTERS))
+    sum(cc_emitter[n].*(min((CAPEX_noCC[n] .+ OPEX_noCC[n]) .- (CAPEX_1[n] .+ OPEX_1[n]), (TOT_fossil_CO2[n])*CO2_tax)) for n in EMITTERS))
 
 
 
     return model
 
 end
-
-
 

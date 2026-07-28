@@ -1,7 +1,7 @@
 #---------------------
 # CODE INFO
 # author: Flore Verbist 
-# description: this code is used for the paper entitled "Unravelling CO2 value chain participation under negative emission pricing and industry relocation"
+# description: this code is used for the paper entitled "Assessing CO2 value chain participation under negative emission pricing and industry relocation"
 
 
 # To restart the Julia kernel in Visual Studio Code (VSC), you can use the built-in command palette:
@@ -13,10 +13,13 @@
 #-------------------------
 ## MAIN FILE 
 # Step 0: activating environment
+
 using Pkg 
-# Pkg.activate(@__DIR__) # @__DIR__ = directory this script is in
-# Pkg.instantiate() # If a Manifest.toml file exist in the current project, download all the packages declared in that manifest. Else, resolve a set of feasible packages from the Project.toml files and install them.
-# USE v1.10 of julia !
+
+#Pkg.activate("./Env") 
+Pkg.activate("./Env2") 
+Pkg.instantiate() # If a Manifest.toml file exist in the current project, download all the packages declared in that manifest. Else, resolve a set of feasible packages from the Project.toml files and install them.
+# Use of  julia v1.12!
 
 # Step 1: 
 # A) input packages
@@ -25,15 +28,18 @@ using Pkg
 ##################################################################################################################################################
 # if error in packages start removing them one by one - rm Package_name - and add them one by one or with , for the onese you are certain off. 
 ##################################################################################################################################################
-using CSV, Dates, Statistics, DataFrames, XLSX, Plots, StatsPlots, LaTeXStrings, Vega, NumericIO, Combinatorics, JLD2, FileIO, DataStructures, Distances, Shapefile
-using Geodesy, GeoInterface, GeoDataFrames, OrderedCollections, ReverseGeocode, StaticArrays, PiecewiseLinearOpt, Interpolations, Optim, Random, Clustering
-using  Graphs, Proj4  # Ensuring no stand alone pipelines
-using GMT # https://discourse.julialang.org/t/errors-associated-with-using-gmt/70393 # might have problems with ReverseGeocode actually
+# # note that if Gurobi stops working this might be caused by a downgrade the Gurobi_jll, and causes the Adapt --> AdaptStaticArraysExt to fail, and also dependencies of gurobi
+using WebIO, GMT # https://discourse.julialang.org/t/errors-associated-with-using-gmt/70393 # might have problems with ReverseGeocode actually
+using CSV, Dates, GeoInterface, Statistics, DataFrames, XLSX, Plots, StatsPlots,  Vega, NumericIO, Combinatorics, JLD2, FileIO, DataStructures, Distances
+using Geodesy, GeoDataFrames, OrderedCollections, ReverseGeocode, StaticArrays, PiecewiseLinearOpt, Interpolations, Optim, Random, Clustering
+using  Graphs   # Ensuring no stand alone pipelines
+using LaTeXStrings
 using JuMP, Gurobi # https://discourse.julialang.org/t/gurobi-failed-to-precompile/44606/8
-using Plots; LaTeXStrings;  pgfplotsx()
+using Plots; LaTeXString;  pgfplotsx()
 using GeometryBasics    # This package might also cause the error interdependency with Adapt --> AdaptStaticArraysExt
 using Polynomials # might have an issue with JuMP
 # note that if Gurobi stops working this might be caused by a downgrade the Gurobi_jll, and causes the Adapt --> AdaptStaticArraysExt to fail, and also dependencies of gurobi
+# using Shapefile, Proj4 # those don't work well atm
 
 
 # B) input function files attached to the main file 
@@ -47,7 +53,7 @@ include("data_processing.jl")  # dataprocessing
 
 # C) Parameters scenario 
 # C.1) ########################## Selection of case parameters ##########################
-Scenario_name = "CDR_price"     # Selection options: #  CDR_price # No_CDR_price # Exit # Exit_no_CDR
+Scenario_name = "No_CDR_price"  # Selection options: #  CDR_price # No_CDR_price # Exit # Exit_no_CDR
 Scenario_horizon = 2050         # Optimisation year (currently only applicable to 2050)
 Region = "Trilateral"           # Selection options: # Europe # Trilateral
 
@@ -56,63 +62,70 @@ Intercept = true                # True: binary variables for pipeline investment
 
 CO2_tax = 150                   # Emission Trading price EUR/tCO2 
 detail_level = "coarse"         #Selection options for candidate grid detail: dense #coarse
+Scaling_ccts = 2.0              # indicates how many times T&S, CC is more expensive in relation to the initial data 
 
 Social_decision = true          # true: cc_emitters = variable, false: cc_emitters = parameter
 Tariff = false                  # true: emitters are imposed by a max tariff level, false: emitters do not receive a predefined tariff level
 MPEC = false                    # true: profit maximisation model, false: system optimal optimisation model 
+UK_storage = false              # true: UK storage sites are included, false: UK storage sites are not included. 
+France = false                  # true: FRE1, FRE2 included
 # C.2) ################## parameters underlying scenario data (only used first time preprocessing) ##################
 system_data_file =   eval(Symbol("system_data_file_", detail_level))        # System input data 
 # C.3) ############ parameters sensitivity analysis/multi-run analysis ###########
 HPC = false
 CO2_tax_vect = [0, 25, 50, 100, 150, 175, 200, 250, 300, 350]
 Scenario_horizon_vect = [2050]
-Scenario_name_vect = ["No_CDR_price", "CDR_price",  "Exit_no_CDR", "Exit"] # "No_Bio"
+Scenario_name_vect = ["No_CDR_price", "CDR_price", "Exit_no_CDR", "Exit"]  #["No_CDR_price", "CDR_price", "Exit_no_CDR", "Exit"] # "No_Bio"
 Scenario_title_vect = ["CDR price", "No CDR price", "No Biomass", "EU Exit (CDR)", "EU Exit (no CDR)"]
 tariff_vector = [6.29, 27.5, 10.97,  96.15]
 tariff = tariff_vector[2]
 Range_opt = [0,300]
 Samples = 100
-
+Subcase_name = "allpipes"
  
 # D) ##################################  Case runs   ########################################
 
 Costs, Routing_nodes_all, Pipelines_all, Terminals, Storage_offshore, Storage_inland, Offshore_nodes, Clusters = import_data_TandS(system_data_file)
+CO2_tax_vect = [50, 100, 150, 200, 250, 300]
 
+for C in CO2_tax_vect
+    global CO2_tax = C
+    print("CO2 tax:  $(CO2_tax)")
+    k = 0
+    for SN in Scenario_name_vect
+        k = k + 1
+        for SH in Scenario_horizon_vect
 
-k = 0
-for SN in Scenario_name_vect
-    k = k + 1
-    for SH in Scenario_horizon_vect
+            global Scenario_name = SN
+            global Scenario_horizon = SH
+            # Loading the correct parameters 
+            # global Figure_name = "$(Scenario_name)_$(Subcase_name)"
+            Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
 
-        global Scenario_name = SN
-        global Scenario_horizon = SH
-        # Loading the correct parameters 
-        global Figure_name = "$(Scenario_name)_$(Region)_$(detail_level)"
-        Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
+            include("parameters.jl")    # run all the parameters of the script
+            Max_total_connections = count(!iszero,values(TOT_capture_1_CO2))
+            # preOpt_visualisation_py(shapefile_eu)
+            model_1 = 0
+            print("$(Scenario_name)------$(Subcase_name)")
+            print("")
+            model_1 = Model(optimizer_with_attributes(Gurobi.Optimizer,  "DualReductions" => 0, "TimeLimit" => 100, "MIPFocus" => 1)) #"OutputFlag" =>0 # "DualReductions" => 0 allows to find out if model is infeasable or unbounded
+            #  "FeasibilityTol" => 1e-8, "OptimalityTol" => 1e-3
+            global model_1 = initiate_optimal_coordination_model(model_1, Social_decision, Tariff, Intercept, (Initialization = false; Initialization))
+            optimize!(model_1)
+            global gap = MOI.get(model_1, MOI.RelativeGap())
+            print(gap)
+            parameters_extract(model_1)
+            variables_extract(model_1)
 
-        include("parameters.jl")    # run all the parameters of the script
-        Max_total_connections = count(!iszero,values(TOT_capture_1_CO2))
-        # preOpt_visualisation_py(shapefile_eu)
-        model_1 = 0
-        print(Figure_name)
-        print("")
-        model_1 = Model(optimizer_with_attributes(Gurobi.Optimizer,  "DualReductions" => 0, "TimeLimit" => 500, "MIPFocus" => 2)) #"OutputFlag" =>0 # "DualReductions" => 0 allows to find out if model is infeasable or unbounded
-        #  "FeasibilityTol" => 1e-8, "OptimalityTol" => 1e-3
-        global model_1 = initiate_optimal_coordination_model(model_1, Social_decision, Tariff, Intercept, (Initialization = false; Initialization))
-        optimize!(model_1)
-        global gap = MOI.get(model_1, MOI.RelativeGap())
-        print(gap)
-        parameters_extract(model_1)
-        variables_extract(model_1)
-
-        # extracting_start_solution(model_1, Scenario_name, detail_level, Pieces)
-        Pipes_opt_co_na, Pipes_opt_sizes = opt_result_extracting4visualisation(model_1); # suppress output because prettytables doesn't work well 
-        industrial_results_save(model_1, results_industry_file::String)
-        Key_output_df = key_results_save(model_1, detail_level, results_stats_file, results_industry_file, scenario_file)
-        pipeline_results_save(results_pipes_file::String, Pipes_opt_co_na, Pipes_opt_sizes)
-        Storages_output_df = storage_results_save(Scenario_name::String, Region::String, CO2_tax::Int64)
-        visualisation_pipes(shapefile_eu, Figure_name, (title_plot = ""; title_plot))
-        # TandS_fraction_cost_plot(model_1)
+            # extracting_start_solution(model_1, Scenario_name, detail_level, Pieces)
+            Pipes_opt_co_na, Pipes_opt_sizes = opt_result_extracting4visualisation(model_1); # suppress output because prettytables doesn't work well 
+            industrial_results_save(model_1, results_industry_file::String)
+            Key_output_df = key_results_save(model_1, detail_level, results_stats_file, results_industry_file, scenario_file)
+            pipeline_results_save(results_pipes_file::String, Pipes_opt_co_na, Pipes_opt_sizes)
+            Storages_output_df = storage_results_save(Scenario_name::String, Region::String, CO2_tax::Int64)
+            # visualisation_pipes(shapefile_eu, Scenario_name, Subcase_name) 
+            # TandS_fraction_cost_plot(model_1)
+        end
     end
 end
 # E)  ###################### External result extraction  ############################
@@ -127,18 +140,21 @@ HPC_csv_output_data_to_excel(Scenario_name_vect, Region, CO2_tax, detail_level)
 # E.2) Visualisation using output csv files  
 CO2_tax = 150
 Region = "Trilateral" 
-Social_decision = false 
+Social_decision = true 
 Tariff = false
+France = false
+UK_storage = false
 detail_level = "coarse"
 Scenario_name = Scenario_name_vect[(i=4;i)]
-for (i, SN) in enumerate(Scenario_name_vect)
+Subcase_name = "H2_5.4_all_pipes_UK"
+for (i, SN) in enumerate(Scenario_name_vect[1:2])
     global Scenario_name = SN
     global Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
     include("parameters.jl")    # run all the parameters of the script
-    Key_df_results = key_results_extract(results_stats_Trilateral_file_HPC::String, Scenario_name::String, Region::String, CO2_tax::Int64)
-    storages_extract = storage_results_extract(Scenario_name::String, Region::String, CO2_tax::Int64)
+    Key_df_results = key_results_extract(Scenario_name::String, Subcase_name::String,  CO2_tax::Int64)
+    storages_extract = storage_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
     print(Key_df_results)
-    visualisation_pipes(shapefile_eu, (Figure_name = "$(Scenario_name)_$(Region)_$(detail_level)"; Figure_name), (title_plot = ""; title_plot))
+    visualisation_pipes(shapefile_eu, Scenario_name, Subcase_name)
 end
 
 # E.3) Sankeys 
@@ -148,7 +164,7 @@ Region = "Trilateral"
 Social_decision = true 
 Tariff = false
 detail_level = "coarse"
-Scenario_name = Scenario_name_vect[1]
+Scenario_name = Scenario_name_vect[2]
 Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
 include("parameters.jl")    # run all the parameters of the script
 
@@ -156,8 +172,8 @@ All_key_results_df_Trilateral = HPC_result_extraction(results_pipes_Trilateral_f
 All_key_results_df_Trilateral[!,"MIPgap"]
 All_key_results_df_Trilateral[!,"Average T&S costs"]
 DF_sankey_Trilateral = sankey_3_scenario_change_py(results_industry_Trilateral_file_HPC, (Scenario_name_1 = "No_CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Scenario_name_3 = "Exit"; Scenario_name_3), (Figure_name = "$(Region)_sankey_py"; Figure_name), (Plotting = true; Plotting))
-DF_sankey_Trilateral = sankey_2_scenario_change_py(results_industry_Trilateral_file_HPC, (Scenario_name_1 = "CDR_price"; Scenario_name_1), (Scenario_name_2 = "Exit"; Scenario_name_2), (Figure_name = "$(Region)_sankey_py"; Figure_name), (Plotting = true; Plotting))
-DF_sankey_Trilateral = sankey_2_scenario_change_py(results_industry_Trilateral_file_HPC, (Scenario_name_1 = "No_CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Figure_name = "$(Region)_sankey_py"; Figure_name), (Plotting = true; Plotting))
+DF_sankey_Trilateral = sankey_2_scenario_change_py((Scenario_name_1 = "CDR_price"; Scenario_name_1), (Scenario_name_2 = "Exit"; Scenario_name_2),  (Plotting = true; Plotting))
+DF_sankey_Trilateral = sankey_2_scenario_change_py((Scenario_name_1 = "No_CDR_price"; Scenario_name_1), (Scenario_name_2 = "CDR_price"; Scenario_name_2), (Plotting = true; Plotting))
 
 # E.4) Cost fractions T&S 
  TandS_fraction_cost_plot((absolute = true; absolute))
@@ -170,14 +186,17 @@ Region = "Trilateral"
 Social_decision = true 
 Tariff = false
 detail_level = "coarse"
+Subcase_name = "allpipes"
 Scenario_name = Scenario_name_vect[1]
-Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
-include("parameters.jl")    # run all the parameters of the script
-WtP_curve(Scenario_name)
-
+for (i, SN) in enumerate(Scenario_name_vect)
+    global Scenario_name = SN
+    global Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
+    include("parameters.jl")    # run all the parameters of the script
+    WtP_curve(Scenario_name,Subcase_name)
+end
 
 # E.6) Pie Plots 
-visualisation_capture_clusters(Scenario_name::String, (CDR_effect = false; CDR_effect), (Legend = false; Legend))
+visualisation_capture_clusters(Scenario_name::String, (CDR_effect = true; CDR_effect), (Legend = true; Legend))
 
 # E.7) Other results 
 for Scenario_name in Scenario_name_vect
@@ -189,6 +208,9 @@ for Scenario_name in Scenario_name_vect
     print(Total_bio_scenario_twh)
 end
 
+# E.8) ETS sensitivity analysis
+Subcase_name = "allpipes"
+ETS_mass_effect(Scenario_name_vect, Scenario_horizon_vect, CO2_tax_vect)
 
 
 # F) ######################### CHECKS ####################################

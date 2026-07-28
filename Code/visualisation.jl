@@ -12,12 +12,12 @@ function TandS_fraction_cost_plot(absolute::Bool)
     # print("Piecewise error (Actual - Piecewise): $((c_transport_actual - c_transport)/Q_tot)----EUR/tCO2/yr")
 
     All_key_results_df =  HPC_result_extraction(results_pipes_Trilateral_file_HPC::String, results_stats_Trilateral_file_HPC::String, results_industry_Trilateral_file_HPC::String, Scenario_name_vect, Scenario_horizon_vect, CO2_tax, (plotting=false; plotting))
-    c_transport = All_key_results_df[:, "Pipeline cost"]
-    c_storage = All_key_results_df[:, "Storage cost"]
-    c_booster = All_key_results_df[:, "Booster cost"]
+    c_transport = Scaling_ccts*All_key_results_df[:, "Pipeline cost"]
+    c_storage = Scaling_ccts*All_key_results_df[:, "Storage cost"]
+    c_booster = Scaling_ccts*All_key_results_df[:, "Booster cost"]
     Q_tot = All_key_results_df[:, "Total capture volume"]
     Colors = ["lightcyan4" "powderblue" "steelblue3"]
-    c_total = c_transport + c_storage + c_booster
+    c_total =  c_transport + c_storage + c_booster
 
     if absolute == true
         LC_P = c_transport./Q_tot
@@ -48,11 +48,24 @@ function TandS_fraction_cost_plot(absolute::Bool)
 
 
 
+    #plt.tight_layout()
+    if MPEC == true 
+        if absolute == true
+            save_path = "./Figures/MPEC/TandS_cost_fractions_abs.svg"
+        else
+            save_path = "./Figures/MPEC/TandS_cost_fractions_rel.svg"
+        end
+    else
+        if absolute == true
+            save_path = "./Figures/Base/TandS_cost_fractions_abs.svg"
+        else
+            save_path = "./Figures/Base/TandS_cost_fractions_rel.svg"
+        end
+    end
 
 
 
-    filename_string = "./Figures/TandS_cost_fractions.svg"
-    Plots.savefig(fig, filename_string)
+    Plots.savefig(fig, save_path)
     display(fig)
 
 end
@@ -247,7 +260,7 @@ end
 function costs_plots(Scenario_name::String, Scenario_horizon::Int64)
 
     global Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64)
-    Key_results_df =  key_results_extract(results_stats_file::String, Scenario_name::String, Region::String,  CO2_tax::Int64)
+    Key_results_df =  key_results_extract(Scenario_name::String, Subcase_name::String,  CO2_tax::Int64)
 
     Product_names = sort!(unique(Emitters[:, "Product_route_name"]))  
     Route_name_1 = [Emitters[Emitters[:,"Product_route_name"] .== name, "Route_name_1" ][1] for name in Product_names]
@@ -516,11 +529,10 @@ function total_costs_plot(All_key_results_df, Scenario_name_vect, Scenario_horiz
 end
 
 
-function ETS_mass_effect(results_stats_file_HPC, Scenario_name_vect, Scenario_horizon_vect, CO2_tax_vect)
+function ETS_mass_effect(Scenario_name_vect, Scenario_horizon_vect, CO2_tax_vect)
 
     All_key_results_df = DataFrame(
         "Scenario name" => repeat(Scenario_name_vect, inner=(length(Scenario_horizon_vect),)), 
-        "Scenario year" => repeat(Scenario_horizon_vect, length(Scenario_name_vect)),
         "Max total connections" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)),
         "Optimised connections" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)),
         "Total capture potential" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)),
@@ -529,26 +541,26 @@ function ETS_mass_effect(results_stats_file_HPC, Scenario_name_vect, Scenario_ho
         "Total capture volume bio" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)),
         "Biomass use" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)),
         "Average T&S costs" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
-        "MIPgap" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
         "Total costs" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
         "Pipeline cost" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
         "Storage cost" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
         "Booster cost" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
+        "MIPgap" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
+        "C-grid-type" => zeros(length(Scenario_horizon_vect).*length(Scenario_name_vect)), 
         )
 
     Column_name_vect = ["CO2 tax", "Max total connections", "Optimised connections", "Total capture volume", "Total capture volume fossil", "Total capture volume bio"]
     scenario_colors = ["blue", "red", "green", "orange"]
     #CN = "Optimised connections" #"Total capture volume"
     for SN in Scenario_name_vect
-        for SH in Scenario_horizon_vect
-            Figure_name_sens = "sens_$(SN)_$(SH)"
-            SNV = [SN]
-            SHV = [SH]
+            Figure_name_sens = "sens_$(SN)"
+            Scenario_name  = SN
             Sensitivity_results = DataFrame(collect(Symbol.(names(All_key_results_df))) .=> [[] for _ in names(All_key_results_df)])
             for CO2_tax in CO2_tax_vect
-                scenario_key = HPC_result_extraction(results_pipes_file_HPC::String, results_stats_file_HPC::String, results_industry_file_HPC::String, SNV, SHV, CO2_tax, (plotting = false; plotting))
-                Sensitivity_results =vcat(Sensitivity_results,scenario_key)
-                
+                scenario_key = key_results_extract(Scenario_name::String, Subcase_name::String, CO2_tax::Int64)
+                scenario_key_wide = unstack(scenario_key[:, 1:end-1], :Parameters, :Values)
+                scenario_key_wide[!, "Scenario name"] .= Scenario_name
+                Sensitivity_results =vcat(Sensitivity_results,scenario_key_wide)
                 # Plots.scatter!(fill(CO2_tax, length(All_key_results_df[!,1])), All_key_results_df[!, CN], color = scenario_colors)
                 # print(All_key_results_df[!, "Max total connections"])
 
@@ -564,86 +576,106 @@ function ETS_mass_effect(results_stats_file_HPC, Scenario_name_vect, Scenario_ho
             color=["palegreen3" "lightcyan3"],  # Optional: custom colors for bars
             foreground_color_legend = nothing, 
             bar_width=20,  # Adjust bar width
-            ylim = (0, 300), 
-            legend = (0.1, 0.95),
+            ylim = (0, 200), 
+            legend = (0.01, 1.05),
             xticks = (CO2_tax_vect),
             xlabel= L"Carbon price [EUR/tCO$_2$]"          
             )
-            Plots.plot!(twinx(fig),
+
+                        
+            for i in 1:length(CO2_tax_vect)
+                Plots.annotate!(ylim = (0, 200), CO2_tax_vect[i], Sensitivity_results."Total capture potential"[i].+ 5 , Plots.text("$(convert.(Int64,Sensitivity_results."Optimised connections"[i]))/$(convert.(Int64,Sensitivity_results."Max total connections"[i]))", 10, :black)) 
+            end
+            Plots.scatter!(
                 CO2_tax_vect,                # x-axis
-                Sensitivity_results."Optimised connections", # y-axis (right)
+                Sensitivity_results."Total capture potential", # y-axis (right)
                 seriestype=:line,
-                label="Optimised Connections",
+                label="Total capture potential",
                 color=:black,
-                lw=2,
-                ylim=(0, 300),
-                markershape=:circle,
+                ylim=(0, 200),
+                markershape=:hline,
+                markersize= 18,
+                markerstrokewidth=2,
                 markerstrokecolor=:black,
-                yaxis=:right,
+                yaxis=:left,
                 foreground_color_legend = nothing, 
-                legend = (0.6, 0.89)
+                legend = (0.01, 0.94)
             )
-            Plots.plot!(twinx(fig),
-                CO2_tax_vect,                # x-axis
-                Sensitivity_results."Max total connections", # y-axis (right)
-                seriestype=:line,
-                label="Max connections",
-                color=:black,
-                lw=2,
-                ylim=(0, 300),
-                markershape=:circle,
-                markerstrokecolor=:black,
-                linestyle=:dash,
-                yaxis=:right,               # Use right y-axis
-                ylabel="Number of connections",
-                foreground_color_legend = nothing, 
-                legend = (0.6, 0.95)
-            )
-            Plots.plot!(twinx(fig),
+            
+            Plots.scatter!(twinx(fig),
                 CO2_tax_vect,   ymirror = true,              # x-axis
                 Sensitivity_results."Average T&S costs", # y-axis (right)
                 seriestype=:line,
-                label="Avg. T&S costs [EUR/tCO2]",
-                color=:grey,
+                label="Avg. T&S costs",
+                color=:black,
                 lw=2,
                 ylim=(0, 150),
+                markersize = 8,
                 markershape=:xcross,
-                markerstrokecolor=:grey,
-                linestyle=:dash,
+                markerstrokecolor=:black,
                 yaxis=:right,               # Use right y-axis
-                ylabel="Average T&S costs",
+                ylabel="Average T&S costs  [EUR/tCO]",
                 foreground_color_legend = nothing, 
-                legend = (0.6, 0.85)
+                legend = (0.6, 0.96)
             )
 
-            filename_string = "./Figures/$(Figure_name_sens)_$(detail_level).svg"
+            filename_string = "./Figures/Base/ETS_$(Scenario_name)_$(Subcase_name).svg"
             Plots.plot!(twiny(fig), label=false, xticks = false)
 
-            Plots.plot!(fig, size=(800, 500), xtickfontsize = 18, ytickfont = font(18), legendfont = font(18), guidefontsize = 18)
+            Plots.plot!(fig, size=(600, 500), xtickfontsize = 18, ytickfont = font(18), legendfont = font(18), guidefontsize = 18)
             Plots.savefig(fig, filename_string)
             display(fig)
-        end
     end
 
 
 
 end
 
+function storage_economies()
+q_range = range(0, 100, length=100)  # 0 → 100 MtCO2/yr
+# Cost functions
+cost_inl(q) = Scaling_ccts *
+    (1 + OandM_storage) *
+    (C_reservoir_inv + C_drilling_inv*q + C_surface_facility_inv + C_monitoring_inl) /q 
 
-function WtP_curve(Scenario_name)
+cost_off(q) = Scaling_ccts *
+    ( (1 + OandM_storage) * (C_reservoir_inv + C_drilling_inv*q + C_surface_facility_inv) + C_monitoring_off_per_ton * q ) /q 
+costs_inl = [cost_inl(q) for q in q_range]
+costs_off = [cost_off(q) for q in q_range]
+Plots.plot(q_range, costs_inl,
+    label="Onshore storage",
+    xlabel="Injection rate (MtCO₂/yr)",
+    ylabel="Annualised cost [EUR/tCO₂]",
+    linewidth=2, color = :black)
+
+Plots.plot!(q_range, costs_off,
+    label="Offshore storage",
+    linewidth=2, ylim = (0,15), xlim= (0,100), legend = :topright, color=:grey, legendfontsize = 14, xguidefontsize = 12, yguidefontsize =12, xtickfontsize = 12, ytickfontsize=12, grid = true, minorgrid=false)
+
+Plots.plot!(twiny(), label=false, xticks = false,  ylim = (0,15), xlim= (0,100), grid = false, minorgrid=false)
+Plots.plot!(twinx(), label=false, yticks = false, ylim = (0,15), xlim= (0,100),   grid = false, minorgrid=false)
+
+end
+
+function WtP_curve(Scenario_name, Subcase_name)
 
 Emitters = import_data_industry(CO2_tax::Any, Scenario_name::String, Scenario_horizon::Int64) #, (load_data=true; load_data))
 
 include("parameters.jl")    # run all the parameters of the script
 
-Key_results_df =  key_results_extract(results_stats_file::String, Scenario_name::String, Region::String,  CO2_tax::Int64)
+Key_results_df =  key_results_extract(Scenario_name::String, Subcase_name::String,  CO2_tax::Int64)
 TaS = Key_results_df[Key_results_df[:, "Parameters"] .== "Average T&S costs", "Values"][1]
-file_industry = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"
+if MPEC == true
+    file_industry = "./Output data files/CSV intermediaries $(detail_level)/MPEC/Results_industry_$(Scenario_name)_$(CO2_tax)_$(Subcase_name).csv"
+else
+    file_industry = "./Output data files/CSV intermediaries $(detail_level)/Results_industry_$(Scenario_name)_$(CO2_tax)_$(Subcase_name).csv"
+end
+
 Industry_connection_results = CSV.read(file_industry, DataFrame)
 cc_emitter =  Dict(e => try Industry_connection_results[Industry_connection_results[:, "Emitters"] .== e, "Bin_connection"][1] catch skip end for e in EMITTERS)
     
 
-WtP =  Dict(emitter => (CAPEX_noCC[emitter] + OPEX_noCC[emitter] - CAPEX_1[emitter] - OPEX_1[emitter])./((TOT_bio_CO2[emitter]+TOT_fossil_CO2[emitter])) for emitter in EMITTERS) # EUR/tCO2
+WtP =  Dict(emitter => minimum([(CAPEX_noCC[emitter] + OPEX_noCC[emitter] - CAPEX_1[emitter] - OPEX_1[emitter])./((TOT_bio_CO2[emitter]+TOT_fossil_CO2[emitter])), CO2_tax]) for emitter in EMITTERS) # EUR/tCO2
 Emitters.WtP = [get(WtP, id, NaN) for id in Emitters.Emitter_id]  # Assuming column "Emitter_ID"
 
 # Remove rows with missing WtP or CO2 capture
@@ -674,11 +706,11 @@ sorted_emitters.x_start = round.(cumsum(vcat(0.0, sorted_emitters.widths[1:end-1
     Emitters_cancelled_names = [Emitters[Emitters[:,"Emitter_id"] .==k, "Product_route_name"][1] for (k, v) in zip(keys(Emitters_cancelled),Emitters_cancelled)]
     counts_cancelled = Dict(p => count(==(p), Emitters_cancelled_names) for p in Product_names)
     counts_remained = Dict(p => counts_modelled[p] - counts_cancelled[p]  for p in Product_names)
-    string_count = Dict(p => "$(counts_cancelled[p])/$(counts_modelled[p])"  for p in Product_names)
+    string_count = Dict(p => "$(counts_remained[p])/$(counts_modelled[p])"  for p in Product_names)
 
 
 # Plot
-
+Sorted_products = unique(sorted_emitters[:,"Product_route_name"])
 
 # Group by Product Route
 gdf = DataFrames.groupby(sorted_emitters, :Product_route_name)
@@ -695,36 +727,35 @@ ordered_products = reverse([
     "chemical-PE",
     "cement",
     "steel-primary",
-    "refineries-light-liquid-fuel",
     "glass-container",
     "glass-float",
-    "glass-fibre"
-
+    "glass-fibre",
+    "refineries-light-liquid-fuel"
 ])
 
 # Generate color palette with same length
 product_colors = Dict(
-    ordered_products .=> palette(:tab10, length(ordered_products))
-)
+    ordered_products .=> palette(:seaborn_colorblind, length(ordered_products))
+) #:tab10
 
 
 # 4. Assign a color per product type (in order of appearance)
-colors = Dict(ordered_products .=> palette(:tab10, length(ordered_products)))
+colors = Dict(ordered_products .=> palette(:seaborn_colorblind, length(ordered_products)))
 
 # Initialize plot
 p = Plots.plot(; legend=true,
-          xlabel="Cummulative capture volume per emitter (MtCO2pa)",
+          xlabel="Capture volume per emitter (MtCO2pa) (cummulative scale)",
           ylabel="Willingness to pay for T\\&S (EUR/tCO2)",
           size=(700, 500),
-          tickfont=font(14), guidefont=font(14), legendfont=font(14), ylim = (0,320))
+          tickfont=font(14), guidefont=font(14), legendfont=font(14), ylim = (-20,320))
 seen_labels = Set{String}()
 # Plot each product group
-    for product in ordered_products
+    for product_sort in Sorted_products
         try 
-            sorted_emitters_product = sorted_emitters[sorted_emitters[:, "Product_route_name"] .== product, :]
+            sorted_emitters_product = sorted_emitters[sorted_emitters[:, "Product_route_name"] .== product_sort, :]
             for row in eachrow(sorted_emitters_product)
                 product = row.Product_route_name
-                label = product ∉ seen_labels ? "$(product) (x: $(string_count[product]))" : ""
+                label = product ∉ seen_labels ? "$(product) (CC: $(string_count[product]))" : ""
                 push!(seen_labels, product)
                 Plots.bar!(p, [row.x_start .+ row.widths/2], [row.WtP];
                     bar_width = row.widths,
@@ -736,9 +767,29 @@ seen_labels = Set{String}()
                     legend = :topright #:topleft
                 )
                 if cc_emitter[row.Emitter_id] < 0.1
-                    # Plots.annotate!([row.x_start .+ row.widths/2], [row.WtP .+ 6] , Plots.text("x", 15, :darkred)) 
-                    Plots.scatter!(twinx(p), [row.x_start .+ row.widths/2], [row.WtP .+ 6] , ylim=(0,320), yticks = false, xticks = false, marker=(:xcross, 5, :darkred), label="Cancelled sites", legend = :topleft, legendfont=font(14))
+                    # Plots.scatter!(twinx(p), [row.x_start .+ row.widths/2], [row.WtP .+ 6] , ylim=(-20,320), yticks = false, xticks = false, marker=(:xcross, 5, :darkred), label="Cancelled sites", legend = :topleft, legendfont=font(14))
+                    Plots.bar!(p, [row.x_start .+ row.widths/2], [-10];
+                    bar_width = row.widths,
+                    fillalpha = 1.0,
+                    linecolor = "indianred",
+                    fillcolor = "indianred",
+                    linealpha = 1.0,
+                    label = "", #label
+                    legend = :topright #:topleft
+                )
+                else 
+                    Plots.bar!(p, [row.x_start .+ row.widths/2], [-10];
+                    bar_width = row.widths,
+                    fillalpha = 1.0,
+                    linecolor = "springgreen",
+                    fillcolor = "springgreen",
+                    linealpha = 1.0,
+                    label = "", #label
+                    legend = :topright #:topleft
+                )
+ 
                 end
+                hline!([0], color=:black, lw=1.5, label="")
             end
         catch e 
             missing 
@@ -770,8 +821,11 @@ display(p)
 #         )
 #     end
 # end
-
-filename_string = "./Figures/Base/WtP_$(Scenario_name).svg"
+if MPEC== true
+    filename_string = "./Figures/MPEC/WtP_$(Scenario_name)_$(Subcase_name).svg"
+else
+    filename_string = "./Figures/Base/WtP_$(Scenario_name)_$(Subcase_name).svg"
+end
 Plots.savefig(p, filename_string)
 
 

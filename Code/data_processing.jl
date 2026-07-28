@@ -1,4 +1,3 @@
-#
 function PMT_calculator(CAPEX_tot, periods, interest)
     # PMT = periodic payment amount 
     cost_PMT = (CAPEX_tot.*interest.*(1+interest)^(periods))/((1+interest)^periods - 1)
@@ -18,97 +17,16 @@ function DCCI_calculator(cost, original_year, reference_year, DCCI_dict)
     return cost_inflation  
 end
 
-
-function merge_csv_files_to_excel(output_filename, file_list)
-    # Create a new Excel file
-    XLSX.openxlsx(output_filename, mode="rw") do xf
-        for (i, file) in enumerate(file_list)
-            SheetName = "$(Scenario_name_vect[i])_$(Region)_$(CO2_tax)"
-            df_csv = CSV.read(file, DataFrame)
-            try 
-                XLSX.addsheet!(xf, SheetName)
-            catch 
-            end
-            sheet = xf[SheetName]
-            XLSX.writetable!(sheet, df_csv; anchor_cell=XLSX.CellRef("A1")) # NOTE: if shorter df --> some rows of previous run might still be included in excel table. (not yet resolved nicely: https://felipenoris.github.io/XLSX.jl/stable/api/)
-        end
-    end
-end
-
-
-function HPC_csv_output_data_to_excel(Scenario_name_vect, Region, CO2_tax, detail_level)
-    file_list_industry = []
-    file_list_pipelines = []
-    file_list_stats = []
-    for Scenario_name in Scenario_name_vect
-        file_list_industry_int = ["./Output data files/CSV intermediaries $(detail_level)/"].* ["Results_industry_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"]
-        file_list_pipelines_int = ["./Output data files/CSV intermediaries $(detail_level)/"].* ["Results_pipelines_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"]
-        file_list_stats_int = ["./Output data files/CSV intermediaries $(detail_level)/"].* ["Results_statistics_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"]
-
-        push!(file_list_industry, file_list_industry_int)
-        push!(file_list_pipelines, file_list_pipelines_int)
-        push!(file_list_stats, file_list_stats_int)
-    end 
-
-    merge_csv_files_to_excel("./Output data files/Results_industry_$(Region)_HPC.xlsx", file_list_industry)
-    merge_csv_files_to_excel("./Output data files/Results_pipelines_$(Region)_HPC.xlsx", file_list_pipelines)
-    merge_csv_files_to_excel("./Output data files/Results_statistics_$(Region)_HPC.xlsx", file_list_stats)
-end
-
-
-function HPC_csv_input_data_to_excel(Scenario_name_vect, Region, CO2_tax, detail_level)
-    file_list_industry = []
-    file_list_pipelines = []
-    file_list_stats = []
-    for Scenario_name in Scenario_name_vect
-        file_list_industry_int = ["./Output data files/CSV intermediaries $(detail_level)/$(Region)/$(CO2_tax)/"].* ["Results_industry_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"]
-        file_list_pipelines_int = ["./Output data files/CSV intermediaries $(detail_level)/"].* ["Results_pipelines_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"]
-        file_list_stats_int = ["./Output data files/CSV intermediaries $(detail_level)/"].* ["Results_statistics_HPC_$(Scenario_name)_$(Region)_$(CO2_tax).csv"]
-
-        push!(file_list_industry, file_list_industry_int)
-        push!(file_list_pipelines, file_list_pipelines_int)
-        push!(file_list_stats, file_list_stats_int)
-    end 
-
-    merge_csv_files_to_excel("./Output data files/Results_industry_$(Region)_HPC.xlsx", file_list_industry)
-    merge_csv_files_to_excel("./Output data files/Results_pipelines_$(Region)_HPC.xlsx", file_list_pipelines)
-    merge_csv_files_to_excel("./Output data files/Results_statistics_$(Region)_HPC.xlsx", file_list_stats)
-end
-
-
-
-function extracting_start_solution(model_1, Scenario_name, detail_level, Pieces)
-
-    delta_matrix = [value(model_1[:delta][pc, p]) for p in PIPES, pc in 1:Pieces]  # note: transpose order
-    beta_off_vector = [value(model_1[:beta_off][s]) for s in STORAGES_OFF]  # note: transpose order
-    beta_inl_vector = [value(model_1[:beta_inl][s]) for s in STORAGES_INL]  # note: transpose order
-
-    beta_off_padded = vcat(beta_off_vector, fill(missing, length(delta_matrix[:,1]) - length(beta_off_vector)))
-    beta_inl_padded  = vcat(beta_inl_vector,  fill(missing, length(delta_matrix[:,1]) - length(beta_inl_vector)))
-    delta_df = DataFrame(delta_matrix, Symbol.(PIECES))
-    beta_df = DataFrame(Symbol.("Storage_off") => beta_off_padded, 
-    Symbol.("Storage_inl") => beta_inl_padded) 
-    # rename!(delta_df, Dict(col => Symbol("Piece_", col) for col in names(delta_df)))
-    data_binaries = hcat(delta_df, beta_df)
-    filename_delta ="./Input data files/CSV hot start $(detail_level)/$(Region)_$(Scenario_name)_$(Pieces).csv"
-    CSV.write(filename_delta, data_binaries)
-
-    x1 = all_variables(model_1);
-    x1_solution = value.(x1);
-
-    d = Dict(string(n)=>v for (n,v) in zip(x1, x1_solution))
-    filename_all_variables ="./Input data files/CSV hot start $(detail_level)/Dict_$(Region)_$(Scenario_name)_$(Pieces).csv"
-    CSV.write(filename_all_variables, d)
-
-
-end
-
 function CCTS_element_selection(Region::String)
     if Region == "Trilateral"
         Pipeline_NUTS0 = ["BE", "NL", "DE", "FR", "LU", "NO", "SE", "DK"]
         #Pipeline_NUTS0 = ["BE", "NL", "DE", "FR"]
         NUTS_0 = ["BE" "NL"]   #  NUTS_0 = ["BE"] #
-        NUTS_2 = ["DEA"] # ["DEA"] # PROBLEM: 2 dots are connected to south region, not to north... gives problem "DEA" NUTS_2 = []
+        if France == true 
+            NUTS_2 = ["DEA" "FRE1" "FRE2"]  # ["DEA"] or  NUTS_2 = ["DEA" "FRE1" "FRE2"]  # PROBLEM: 2 dots are connected to south region, not to north... gives problem "DEA" NUTS_2 = []
+        else 
+            NUTS_2 = ["DEA"]
+        end 
         SECTOR_id = [1 2 3 4 5 6]
         global EMITTERS, CLUSTERS = emitter_cluster_selection(Emitters, NUTS_0, NUTS_2, SECTOR_id)
         global Pipelines = Pipelines_all[in.(Pipelines_all[:, "NUTS0"], Ref(Pipeline_NUTS0)), :] # Pipelines = Pipelines_all
@@ -260,59 +178,6 @@ function opt_result_extracting4visualisation(model)
 end
 
 
-
-
-function enya_hans_check(file)
-
-    Hydrogen_results_file = "./Enya-Hans/hydrogen_backbone.xlsx"
-    Hydrogen_df = DataFrame(XLSX.readtable(Hydrogen_results_file, "All_Combined_Data"))
-    Hydrogen_df_BE = Hydrogen_df[(Hydrogen_df[:, "country"] .== "BE") .& (Hydrogen_df[:, "period"] .== Scenario_horizon) .&  (Hydrogen_df[:, "demand_scenario"] .== "min totex") .& (Hydrogen_df[:, "supply_scenario"] .== "offshore green h2"),:]
-    Enya_Hans_filtered_df = unique(Hydrogen_df_BE, [:aidres_site_id, Symbol("totex_costs_per_kt_[meur/kt/y]")])
-
-
-    Emitters = import_data_emitters(system_data_file::Any, Scenario_name::String, Scenario_horizon::Int64, project_run::Bool)
-    Flore_filtered_df = Emitters[Emitters[:,"NUTS0"].== "BE", :]
-
-
-    # Capture amounts
-    sum(Enya_Hans_filtered_df[:, "captured_co2_[tco2/t]"]) #tCO2/t product per year
-    sum(Flore_filtered_df[:, "Captured_CO2_1_tCO2ptpa"])   #tCO2/t product per year
-    sum(Flore_filtered_df[:, "Captured_CO2_1_tCO2ptpa"].*(Flore_filtered_df[:, "Product_cap_ktpa"]./1000)) # MtCO2 per year
-
-    # Calculating total capture amount of emitters and sort it 
-    Flore_filtered_df.TOTAL_capture_MtCO2pa = Flore_filtered_df.Product_cap_ktpa .* Flore_filtered_df.Captured_CO2_1_tCO2ptpa/1000
-    Flore_filtered_df.TOTAL_BIO_capture_MtCO2pa = Flore_filtered_df.Product_cap_ktpa .* Flore_filtered_df.Capture_ofwhich_bio_1_tCO2ptpa/1000
-    Flore_filtered_df.TOTAL_FOSSIL_capture_MtCO2pa =      Flore_filtered_df.TOTAL_capture_MtCO2pa -   Flore_filtered_df.TOTAL_BIO_capture_MtCO2pa
-    Flore_filtered_df_sorted = sort(Flore_filtered_df, :TOTAL_capture_MtCO2pa, rev=true)
-    Flore_combined_df = select(Flore_filtered_df_sorted, [:AidRES_site_id, :Sector_name, :Product_route_name, :Route_name1, :Product_cap_ktpa,  :Captured_CO2_1_tCO2ptpa, :TOTAL_capture_MtCO2pa, :TOTAL_BIO_capture_MtCO2pa, :TOTAL_FOSSIL_capture_MtCO2pa])
-
-
-    column_labels_capture = DataFrame(Symbol("Total Capture MtCO2pa") => sum(Flore_filtered_df.TOTAL_capture_MtCO2pa), 
-    Symbol("Total Fossil Capture MtCO2pa") =>  sum(Flore_filtered_df.TOTAL_FOSSIL_capture_MtCO2pa), Symbol("Total Bio Capture MtCO2pa") =>  sum(Flore_filtered_df.TOTAL_BIO_capture_MtCO2pa)
-    )
-
-
-
-    Flore_filtered_df_pr = filter!(row -> !occursin("chemical-PE", row.Product_route_name), deepcopy(Flore_filtered_df))
-    sum(Flore_filtered_df[:, "Captured_CO2_1_tCO2ptpa"].*(Flore_filtered_df[:, "Product_cap_ktpa"]./1000)) # MtCO2 per year
-
-    valid_site_ids = Set(Enya_Hans_filtered_df.aidres_site_id)
-    Flore_eh_filtered_df = filter!(row -> !(row.AidRES_site_id in valid_site_ids), deepcopy(Flore_filtered_df)) # ok = only secondary steel 
-    # Total Amount of fabricants 
-    SECTOR_ID_E = [1 2 3 4 5 6]
-    column_labels = ["EH", "F"]
-    df_sector_count = DataFrame([Vector{Union{Missing, Any}}(undef, 6) for _ in column_labels], column_labels)
-    for i in SECTOR_ID_E
-        df_sector_count[i, "EH"] =  nrow(Enya_Hans_filtered_df[Enya_Hans_filtered_df[:,"aidres_sector"] .== i, :])
-        df_sector_count[i, "F"] =  nrow(Flore_filtered_df[Flore_filtered_df[:,"Sector_id"] .== i, :])
-    end
-    # no steel secondary in EH 
-    # 
-
-    return 
-end
-
-
 function emitter_cluster_selection(Emitters, NUTS_0, NUTS_2, SECTOR_id)
     Emitters_filtered = Emitters[.!ismissing.(Emitters.Config_id_1), :]
     Emitters_sector_id = Emitters_filtered[in.(Emitters_filtered[:, "Sector_id"], Ref(SECTOR_id)), :]
@@ -328,6 +193,50 @@ function emitter_cluster_selection(Emitters, NUTS_0, NUTS_2, SECTOR_id)
 end
 
 function CMU_pipe_construction(PMT_periods, interest, reference_year, Plotting::Bool)
+
+
+    # Other literature sources 
+        # DEA total investment cost of a dense phase pipeline offshore in EUR/(tCO2/h)/m of 120 t CO2/h  = 26-43 
+        # source: https://ens.dk/en/analyses-and-statistics/technology-data-carbon-capture-transport-and-storage
+        h_yr = 24*365 # h/yr
+        m_km = 1000  #m/km 
+        f_annual = interest * (1 + interest)^PMT_periods / ((1 + interest)^PMT_periods -1)
+       
+        x_dea = [120, 120, 120, 120]  # tCO2/h
+        y_dea = [10, 17, 26, 43]  # EUR/(tCO2/h)/m
+        y_dea_OandM = [10, 30, 10, 30] #EUR/(tCO2/h)/yr/km
+
+        x_dea_MtCO2_1 = x_dea .* h_yr ./ 10^6  # MtCO2/yr
+        x_dea_MtCO2 = vcat(x_dea_MtCO2_1, 2.5)
+        y_dea_total = y_dea .* x_dea .* m_km ./ 10^6 # MEUR/km 
+        y_dea_specific = y_dea_total ./ x_dea_MtCO2_1
+
+        y_dea_OandM_annualised = y_dea_OandM .* x_dea  / 10^6  #MEUR/(yr.km)
+        y_dea_total_annualised_1 = (y_dea_total) .* f_annual .+ y_dea_OandM_annualised #MEUR/(yr.km)
+        y_dea_total_annualised = vcat(y_dea_total_annualised_1, 6.7/180*2.5)
+        y_dea_specific_annualised = y_dea_total_annualised ./  x_dea_MtCO2 # EUR/tCO2 
+    # DEA 2 
+
+    # JRC   
+        x_JRC_MtCO2 = [10, 50, 95] # MtCO2/yr
+        y_JRC_total = [1.3, 3.1, 5] # MEUR(2022)/km
+
+        y_JRC_total_annualised = y_JRC_total * f_annual #MEUR/(yr.km)
+        y_JRC_specific_annualised = y_JRC_total_annualised ./ x_JRC_MtCO2 # EUR/tCO2
+
+    # IPCC  source: https://ens.dk/en/analyses-and-statistics/technology-data-carbon-capture-transport-and-storage (fig 65)
+        x_ippc_MtCO2 =  [2.5, 2.5, 5, 5, 20, 20, 30, 30 ] # upper and lower ranges MtCO2/yr
+        y_ippc_specific_usd = [4, 7, 2, 5, 1, 2, 0.8, 1.8]./250 # USdollar/tCO2 (for pipe of 250 km)
+        y_ipcc_specific = cost_converter(y_ippc_specific_usd, "", interest, 2005, reference_year, true) # EUR/tCO2 (non annualised)
+        y_ipcc_specific_annualised = y_ipcc_specific   # EUR/tCO2.km annualised - assuming this was already annualised data
+        y_ipcc_total_annualised = y_ipcc_specific_annualised .*  x_ippc_MtCO2 # MEUR/yr.km
+
+    # ZEP - https://zeroemissionsplatform.eu/publication/the-costs-of-co2-transport/
+        x_zep_MtCO2 = [2.5, 2.5, 2.5, 2.5,  2.5, 20, 20, 20, 20, 20, 20, 20]
+        y_zep_specific_annualised = [5.4, 9.3, 20.4, 28.7, 51.7, 1.5, 3.7, 5.3, 3.4, 6.0, 8.2, 16.3]./ [180, 180, 500, 770, 1500, 180, 500, 750, 180, 500, 750, 1500] #EUR/tCO2/km 
+        y_zep_total_annualised = y_zep_specific_annualised .* x_zep_MtCO2
+
+
     # S Mccoy and E Rubin. “An engineering-economic model of pipeline transport of
     # CO2 with application to carbon capture and storage”. In: International Journal
     # of Greenhouse Gas Control 2.2 (Apr. 2008), pp. 219–229. issn: 17505836. doi:
@@ -358,25 +267,19 @@ function CMU_pipe_construction(PMT_periods, interest, reference_year, Plotting::
    
     # Q_m = Pipes_opt_sizes .* 10^9 ./ (365*24*60*60) #kg/s 
     # Diameter = ((Q_MtperY.* 10^9 ./ (365*24*60*60))./(Velocity*pi*0.25*Density_2)).^0.5*Inch_per_meter  # m --> output slightly closer to Middelton, 2012
-
-    Qm_vect = 0:2.5:300 #Mton
+    x_max = 80
+    Qm_vect = 0:2.5:x_max #Mton
 
     L =1   #km
     # f_transport(q) = (1+OandM_pipes).*sum(A0_pipe_construct.*(((q.* 10^9 ./ (365*24*60*60))./(Velocity*pi*0.25*Density_2)).^0.5*Inch_per_meter).^(A2_pipe_construct)) #MEUR
-    x_max = 80
+
     D_max = mass_flow_to_diameter(x_max)
     if Plotting == true
         ################################################################
         # Annualised (per km)
         f_pipe_construct_annualised(x) = A0_pipe_construct.*(((x.* 10^9 ./ (365*24*60*60))./(Velocity*pi*0.25*Density_2)).^0.5*Inch_per_meter).^(A2_pipe_construct)*L # !!ADJUSTMENT HERE # univariate
 
-        Regression_transport =  piecewise_error(Range_opt, Pieces, Samples, Intercept)
-        # println("Transport Regression parameters:", Regression_transport)
-        A_0_pc_transport = Regression_transport[!,"A_0"][1] * Scaling_ccts # !!ADJUSTMENT HERE
-        A_1_pc_transport = Regression_transport[!,"A_1"][1] * Scaling_ccts # !!ADJUSTMENT HERE
-
-        p =Plots.plot(size=(800, 500), xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15))
-        y_var_linear = []
+        p =Plots.plot(size=(800, 500), xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15), legend =:bottomright)
         y_var = []
         for i in 1:length(a0)
             y_var_tot = []
@@ -390,23 +293,45 @@ function CMU_pipe_construction(PMT_periods, interest, reference_year, Plotting::
         x_flat = Float64.(repeat(x_var,4))
         y_flat = Float64.(y_var) .* Scaling_ccts # !!ADJUSTMENT HERE
         Colors = ["springgreen4", "springgreen2", "lightseagreen", "darkseagreen1"]
-        groupedbar!(x_flat, y_flat, group = repeat(Labels, inner = length(Qm_vect)), color = repeat(Colors, inner = length(Qm_vect)), xlabel = L"Mass flow MtCO$_2$/yr", ylabel = "MEUR/yr($(reference_year)) for $(L) km", bar_position = :stack, legend= (0.1, 0.95))
+        groupedbar!(x_flat, y_flat, group = repeat(Labels, inner = length(Qm_vect)), color = repeat(Colors, inner = length(Qm_vect)), xlabel = L"Mass flow MtCO$_2$/yr", ylabel = "MEUR/yr($(reference_year)) for $(L) km", bar_position = :stack)
 
         x_var = Qm_vect # Mt/yr
 
-        y_var = [sum(f_pipe_construct_annualised(Qm_vect[j])[i]  for i in 1:length(a0)) for j in 1:length(Qm_vect)] .* Scaling_ccts # !!ADJUSTMENT HERE
-        y_value_linear = (A_0_pc_transport .+ x_var.*A_1_pc_transport)./(1+OandM_pipes)
-        y_var_linear = push!(y_var_linear, y_value_linear)
-        # Plots.bar!(x_var, y_var*(1+OandM_pipes), label = "Total construction (annualised)", xlabel = "Mass flow MtCO2/yr", ylabel = "MEUR/yr($(reference_year)) for $(L) km", ls = :solid, color = "black", lw = 2)
-        # Plots.bar!(x_var, y_var*OandM_pipes, label = "Total O&M", xlabel = "Mass flow MtCO2/yr", ylabel = "MEUR/yr($(reference_year)) for $(L) km", ls = :dash, color = "grey", lw = 2)
-        Plots.plot!(x_var, y_var_linear, label = "Linear regression fit", xlabel = "Mass flow MtCO2/yr", ylabel = "MEUR($(reference_year))/yr for $(L) km", lw=2, color = "black", xlim = [0, x_max])
+        # y_var = [sum(f_pipe_construct_annualised(Qm_vect[j])[i]  for i in 1:length(a0)) for j in 1:length(Qm_vect)] .* Scaling_ccts # !!ADJUSTMENT HERE
+       
+        LS = [:solid :dash]
+       
+        for p_nr in 1:2
+            Regression_transport =  piecewise_error(Range_opt, p_nr, Samples, Intercept)
+            # println("Transport Regression parameters:", Regression_transport)
+            A_0_pc_transport = Regression_transport[!,"A_0"][1] * Scaling_ccts # !!ADJUSTMENT HERE
+            A_1_pc_transport = Regression_transport[!,"A_1"][1] * Scaling_ccts # !!ADJUSTMENT HERE
+            x_breakpoints = Regression_transport[!,"x_breakpoints"][1]
+            y_value_linear = (A_0_pc_transport .+ A_1_pc_transport .* transpose(x_var)) ./ (1 + OandM_pipes)
+            nrows = size(y_value_linear, 1)
+            y_masked = fill(0.0, length(x_var))
+            for i in 1:nrows
+                idx = (x_var .<= x_breakpoints[i+1]) .&  (x_breakpoints[i] .<= x_var)
+                y_masked[idx] = y_value_linear[i, idx]
+            end
+            # Plots.bar!(x_var, y_var*(1+OandM_pipes), label = "Total construction (annualised)", xlabel = "Mass flow MtCO2/yr", ylabel = "MEUR/yr($(reference_year)) for $(L) km", ls = :solid, color = "black", lw = 2)
+            # Plots.bar!(x_var, y_var*OandM_pipes, label = "Total O&M", xlabel = "Mass flow MtCO2/yr", ylabel = "MEUR/yr($(reference_year)) for $(L) km", ls = :dash, color = "grey", lw = 2)
+            Plots.plot!(x_var, y_masked, label = "$(p_nr)-piece linear regression", xlabel = "Mass flow MtCO2/yr", ylabel = "MEUR($(reference_year))/yr for $(L) km (annualised)", lw=2, color = "black", xlim = [0, x_max], linestyle=LS[p_nr])
+        end
 
-
+        Plots.plot!(twinx(p), xlabel = "", ylabel= "", yticks = false)
+        # Plots.plot!(x_var, 2*(A_0_pc_transport .+ A_1_pc_transport.*x_var), color="black")
+        Plots.scatter!(x_zep_MtCO2, y_zep_total_annualised, label= "ZEP", markershape= :x, color = "black", markersize=4)
+        Plots.scatter!(x_ippc_MtCO2, y_ipcc_total_annualised, label= "IPCC", markershape= :^,color = "black", markersize=4)
+        Plots.scatter!(x_JRC_MtCO2, y_JRC_total_annualised, label= "JRC", markershape= :v,color = "black", markersize=4)
+        Plots.scatter!(x_dea_MtCO2, y_dea_total_annualised, label="DEA",  markershape= :o, color = "black", markersize=4, legend=:topright)
 
         Plots.plot!(twiny(p), xlabel = "Pipeline diameter [m]", ylabel= "", xlim = ([0, D_max]), xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15))
         Plots.plot!(twinx(p), xlabel = "", ylabel= "", yticks = false)
         # Plots.plot!([20, 20], [0, 1.5], label = false, ls=:dash, color = :black)
         
+
+
 
         
         display(p)
@@ -415,42 +340,55 @@ function CMU_pipe_construction(PMT_periods, interest, reference_year, Plotting::
         ################################################################
         # Levelised costs for certain length L en certain mass flow 
         f_pipe_construct_annualised(x) = A0_pipe_construct.*(((x.* 10^9 ./ (365*24*60*60))./(Velocity*pi*0.25*Density_2)).^0.5*Inch_per_meter).^(A2_pipe_construct)*L # univariate
-
-        Regression_transport =  piecewise_error(Range_opt, Pieces, Samples, Intercept)
-        # println("Transport Regression parameters:", Regression_transport)
-        A_0_pc_transport = Regression_transport[!,"A_0"][1]
-        A_1_pc_transport = Regression_transport[!,"A_1"][1]
-
-        p =Plots.plot(size=(800, 500), xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15))
-        y_var_linear = []
+        p =Plots.plot(size=(800, 500), xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15), legend =:topright)
         y_var = []
+        LS = [:solid :dash]
         for i in 1:length(a0)
             y_var_tot = []
 
             for j in 1:length(Qm_vect)
                 y_var = push!(y_var, f_pipe_construct_annualised(Qm_vect[j])[i])
             end
-            x_var = Qm_vect # Mt/yr
+
 
         end
+        x_var = Qm_vect # Mt/yr
         # Plots.plot!(x_var, y_var./x_var, label = Labels[i], xlabel = "Mass flow MtCO2/yr", ylabel = "EUR/yr($(reference_year)/tCO2) for $(L) km")
 
         x_flat = Float64.(repeat(x_var,4))
         y_flat = Float64.(y_var) .* Scaling_ccts # !!ADJUSTMENT HERE
         Colors = ["springgreen4", "springgreen2", "lightseagreen", "darkseagreen1"]
-        groupedbar!(x_flat, y_flat./x_flat, group = repeat(Labels, inner = length(Qm_vect)), color = repeat(Colors, inner = length(Qm_vect)), xlabel = L"Mass flow MtCO$_2$/yr", ylabel = "EUR/yr($(reference_year)/tCO2) for $(L) km", bar_position = :stack, legend= (0.1, 0.95))
+        groupedbar!(x_flat, y_flat./x_flat, group = repeat(Labels, inner = length(Qm_vect)), color = repeat(Colors, inner = length(Qm_vect)), xlabel = L"Mass flow MtCO$_2$/yr", ylabel = "EUR/yr($(reference_year)/tCO2) for $(L) km", bar_position = :stack)
 
         x_var = Qm_vect # Mt/yr
-        y_var = [sum(f_pipe_construct_annualised(Qm_vect[j])[i]  for i in 1:length(a0)) for j in 1:length(Qm_vect)] .* Scaling_ccts # !!ADJUSTMENT HERE
-        y_value_linear = (A_0_pc_transport .+ x_var.*A_1_pc_transport)./(1+OandM_pipes)
-        y_var_linear = push!(y_var_linear, y_value_linear)
-        Plots.plot!(x_var, y_var*(1+OandM_pipes)./x_var, label = "Total construction (annualised)", xlabel = "Mass flow MtCO2/yr", ylabel = "EUR($(reference_year))/tCO2 for $(L) km", ls = :solid, color = "black", lw = 2)
-        Plots.plot!(x_var, y_var*OandM_pipes./x_var, label = "Total O&M", xlabel = L"Mass flow MtCO$_2$/yr", ylabel = "EUR($(reference_year))/tCO2 for $(L) km", ls = :dash, color = "grey", lw = 2, xlim=[0, x_max],legend = (0.55, 0.95))
+        for p_nr in 1:2
+            Regression_transport =  piecewise_error(Range_opt, p_nr, Samples, Intercept)
+            # println("Transport Regression parameters:", Regression_transport)
+            A_0_pc_transport = Regression_transport[!,"A_0"][1] * Scaling_ccts # !!ADJUSTMENT HERE
+            A_1_pc_transport = Regression_transport[!,"A_1"][1] * Scaling_ccts # !!ADJUSTMENT HERE
+            x_breakpoints = Regression_transport[!,"x_breakpoints"][1]
+    
 
+            y_value_linear = (A_0_pc_transport .+ A_1_pc_transport .* transpose(x_var)) ./ (1 + OandM_pipes)
+            nrows = size(y_value_linear, 1)
+            global y_masked = fill(0.0, length(x_var))
+            for i in 1:nrows
+                idx = (x_var .<= x_breakpoints[i+1]) .&  (x_breakpoints[i] .<= x_var)
+                y_masked[idx] = y_value_linear[i, idx]
+            end
+            # y_var_linear = push!(y_var_linear, y_value_linear)
+            Plots.plot!(x_var, y_masked*(1+OandM_pipes)./x_var, label = "$(p_nr)-piece fit", xlabel = "Mass flow MtCO2/yr", ylabel = "EUR($(reference_year))/tCO2 for $(L) km (annualised)", ls = LS[p_nr], color = "black", lw = 2,  xlim = [0, x_max], ylim=[0,0.10])
+            # Plots.plot!(x_var, y_masked*OandM_pipes./x_var, label = "Total O&M", xlabel = L"Mass flow MtCO$_2$/yr", ylabel = "EUR($(reference_year))/tCO2 for $(L) km", ls = :dash, color = "grey", lw = 2, xlim=[0, x_max],legend = (0.55, 0.95))
+        end
 
-        Plots.plot!(twiny(p), xlabel = "Pipeline diameter [m]", ylabel= "", xlim = [0, D_max], xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15))
         Plots.plot!(twinx(p), xlabel = "", ylabel= "", yticks = false)
+
+        Plots.scatter!(x_zep_MtCO2, y_zep_specific_annualised, label= "ZEP", markershape= :x, color = "black", markersize=4)
+        Plots.scatter!(x_ippc_MtCO2, y_ipcc_specific_annualised, label= "IPCC", markershape= :^,color = "black", markersize=4)
+        Plots.scatter!(x_JRC_MtCO2, y_JRC_specific_annualised, label= "JRC", markershape= :v,color = "black", markersize=4)
+        Plots.scatter!(x_dea_MtCO2, y_dea_specific_annualised, label="DEA",  markershape= :o, color = "black", markersize=4, legend=:topright)
         # Plots.plot!([20, 20], [0, 1.5], label = false, ls=:dash, color = :black)
+        Plots.plot!(twiny(p), xlabel = "Pipeline diameter [m]", ylabel= "", xlim = [0, D_max], ylim=[0,0.10], xtickfont=font(15), ytickfont = font(15), legendfont = font(15), guidefont = font(15))
 
            
 
@@ -508,8 +446,39 @@ function tariff_cluster(model_1)
             end
             for e in Cluster_emitters[n]
         ) for n in CLUSTERS
-    )
+    )   
     Clusters_activated_dict = Dict(key => (value > 0 ? 1 : 0) for (key, value) in Participating_clusters)
-    Tariff_cluster = Dict(key => t_c[key]*Clusters_activated_dict[key] for (key, value) in Clusters_activated_dict)
-    return Tariff_cluster
+
+    # Tariff_dict = Dict(key => (t_fixed + t_c[key])*Clusters_activated_dict[key] for (key, value) in Clusters_activated_dict)
+    Tariff_dict = Dict(key => (t_fixed + t_c[Emitter_cluster[key]])*cc_emitter[key] for key in EMITTERS)
+   
+    
+    Tariff_df = DataFrame(
+    Emitter = collect(keys(Tariff_dict)),
+    Tariff   = collect(values(Tariff_dict))
+)
+    filename_tariff = "./Output data files/CSV intermediaries $(detail_level)/MPEC/Results_tariff_$(Scenario_name)_$(CO2_tax)_$(Subcase_name).csv"
+    
+    
+    CSV.write(filename_tariff, Tariff_df)
+   
+   
+    return Tariff_df
+end
+
+function cluster_refpoint_distance(system_data_file, CLUSTERS)
+
+    # Reference point in the port of Rotterdam
+    Reference_lat = 51.898693 # 54.785329 
+    Reference_lon =  4.414102 #3.679677
+    P_ref = (Reference_lat, Reference_lon)
+    Cluster_distance = Dict(c => 0.0 for c in CLUSTERS)
+    Clusters = DataFrame(XLSX.readtable(system_data_file, "Clusters"))
+    for c in CLUSTERS
+        P_centroid = (Clusters[Clusters[:,"Cluster"].== c,"Lat"][1], Clusters[Clusters[:,"Cluster"].== c,"Lon"][1])
+        distance_NZ = haversine(P_ref, P_centroid, 6372.8)
+        Cluster_distance[c] = distance_NZ
+    end
+
+return Cluster_distance
 end

@@ -6,7 +6,6 @@
 EMITTERS = CCTS_element_selection(Region::String)
 
 
-
 for i in 1:length(Pipelines[:,"Distance_km"])
     if Pipelines[i,"Distance_km"] .== 0.0
         Pipelines[i,"Distance_km"] = 1.0 # to make sure that there are no 0 length pipes --> otherwise some weird high solution pops up. 
@@ -119,6 +118,15 @@ Nodes_coordinates = [Nodes[!, "Lat"] Nodes[!, "Lon"]]
 
 Emitter_cluster = Dict(emitter => string.(Emitters[Emitters[!,"Emitter_id"] .== emitter, "Cluster_julia"][1]) for emitter in EMITTERS) 
 Cluster_emitters = Dict(cluster => Emitters[(string.(Emitters[!,"Cluster_julia"]) .== cluster), "Emitter_id"][:] for cluster in CLUSTERS) 
+Cluster_abs_distance = cluster_refpoint_distance(system_data_file, CLUSTERS)
+Tot_cluster_distance= sum(values(Cluster_abs_distance))
+# Std_dev_cluster_distance = std(Clusters[:, "NZ_distance"])
+Cluster_distance_rel_weight = Dict(cluster => Cluster_abs_distance[cluster]./Tot_cluster_distance for cluster in CLUSTERS) # Normalising the distance
+
+
+Emitter_country = Dict(emitter => string.(Emitters[Emitters[!,"Emitter_id"] .== emitter, "NUTS0"][1]) for emitter in EMITTERS) 
+COUNTRIES = unique(vcat(values(Emitter_country)...))
+
 
 TIMES = 1:1:1 
 NODES = vcat(vcat(vcat(vcat(vcat(Cluster_id,  Routing_nodes_id), Terminal_id), Offshore_nodes_id), Storage_offshore_id), Storage_inland_id)
@@ -128,7 +136,21 @@ SPIPES = [(SPipes_origin[i], SPipes_destination[i]) for i in 1:1:length(SPipes_o
 
 ROUTING =   Routing_nodes_id
 # STORAGES_OFF = Storage_offshore_id
-STORAGES_OFF = Storage_offshore[Storage_offshore[:,"NUTS0"] .!= "GB", "Node_id"] # no UK storage
+# STORAGES_OFF = Storage_offshore[Storage_offshore[:,"NUTS0"] .!= "GB", "Node_id"] # no UK storage
+
+if UK_storage == false
+    print("No GB storage")
+    STORAGES_OFF = Storage_offshore[Storage_offshore[:,"NUTS0"] .!= "GB", "Node_id"] # no UK storage
+    # STORAGES_OFF = Storage_offshore[:, "Node_id"] # UK storage - senstivity
+else 
+    print("GB storage")
+    STORAGES_OFF = Storage_offshore[:, "Node_id"] # UK storage allowed
+    print(STORAGES_OFF)
+end
+STORAGES_INL = Storage_inland_id
+# STORAGES_INL = []
+
+
 STORAGES_INL = Storage_inland_id
 # STORAGES_INL = []
 
@@ -159,7 +181,8 @@ Storage_off_capacity =  Dict(storage_node => Storage_offshore[Storage_offshore[:
 
 Index_costs = Costs[!, "Parameter"]
 Index_pipe = Pipelines[!, "Pipeline_id"]
-Pipe_name = Dict(Pipelines[!, "Pipeline_id"][p] => PIPES[p] for p in 1:1:length(PIPES) )
+# Pipe_name = Dict(Pipelines[!, "Pipeline_id"][p] => PIPES[p] for p in 1:1:length(PIPES) )
+Pipe_name = Dict(row["Pipeline_id"] => (row["Node_origin"], row["Node_destination"]) for row in eachrow(Pipelines)) # robuster than line above
 Pipe_distance = Dict(value => Pipelines[Index_pipe .== key, "Distance_km"][1] for (key, value) in Pipe_name)
 # Sline_distance = Dict(value => Shipping[Index_sline .== key, "Distance_km"][1] for (key, value) in Sline_name)
 ####################################################################################################
@@ -217,11 +240,11 @@ Monitoring_inv = cost_converter(2, Storage_periods, interest, 2004, reference_ye
 Monitoring_opex = cost_converter(0.03, "none", "none", 2004, reference_year, false) #EUR/tCO2
 OandM_storage = 0.07 
 
-C_reservoir_inv = Reservoir_inv # MEUR per facility - site development costs 
-C_drilling_inv =  Drilling_inv_per_meter*(Reservoir_thickness + Reservoir_depth + 2*Drilling_inv_per_meter*Horizontal_distance) # MEUR per facility # aconsidering this is only for one well and each Well can only store 1 MtCO2/yr --> MEUR/MtCO2pa  (p111)
-C_surface_facility_inv = Platform_inv/6 # MEUR per facility - surface facility cost per platform (6 wells per platform)
-C_monitoring_inl = Monitoring_inv # MEUR per onshore facility
-C_monitoring_off_per_ton = Monitoring_opex # MEUR/Mton per offshore injection
+C_reservoir_inv = Reservoir_inv # A^(R,INV): MEUR per facility - site development costs 
+C_drilling_inv =  Drilling_inv_per_meter*(Reservoir_thickness + Reservoir_depth + 2*Drilling_inv_per_meter*Horizontal_distance) # AD, INV(LRD + LRT + 2HR) MEUR per facility # aconsidering this is only for one well and each Well can only store 1 MtCO2/yr --> MEUR/MtCO2pa  (p111)
+C_surface_facility_inv = Platform_inv/6 # A^(SP,INV): MEUR per facility - surface facility cost per platform (6 wells per platform)
+C_monitoring_inl = Monitoring_inv # A^(M,INV,INL): MEUR per onshore facility
+C_monitoring_off_per_ton = Monitoring_opex # A^(M,INV,OFF): MEUR/Mton per offshore injection
 f_storage(x) = (1+OandM_storage)*(C_reservoir_inv + C_drilling_inv + C_surface_facility_inv + C_monitoring_inl) #MEUR for only one well drilling investment 
 
 #################### OLD PIPELINE PART ####################

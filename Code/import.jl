@@ -154,7 +154,7 @@ function AidRES_scenario_adjustment(raw_file::Any, scenario_file::Any, Project_u
         coal_eur_t =                        constants[constants[:, "Commodity"] .== "Coal", string(Scenario_horizon)][1],#125
         coke_eur_t =                        constants[constants[:, "Commodity"] .== "Coke", string(Scenario_horizon)][1],#52
         crude_oil_eur_t =                   constants[constants[:, "Commodity"] .== "Crude oil", string(Scenario_horizon)][1],#370
-        hydrogen_eur_kg =                   energy_commodity_prices[energy_commodity_prices[:, "Commodity"] .== "Hydrogen", string(Scenario_horizon)][1],#3
+        hydrogen_eur_kg =                   5.4, #energy_commodity_prices[energy_commodity_prices[:, "Commodity"] .== "Hydrogen", string(Scenario_horizon)][1],#3
         methanol_eur_t =                    constants[constants[:, "Commodity"] .== "Methanol", string(Scenario_horizon)][1], #methanol_MWhLVH_per_ton * energy_commodity_prices[energy_commodity_prices[:, "Commodity"] .== "Methanol", string(Scenario_horizon)],#410 # unit MWHLHV
         ammonia_eur_t =                     constants[constants[:, "Commodity"] .== "Ammonia", string(Scenario_horizon)][1], #ammonia_MWhLVH_per_ton * energy_commodity_prices[energy_commodity_prices[:, "Commodity"] .== "Ammonia", string(Scenario_horizon)],  #450  # unit MWhLHV
         naphtha_eur_t =                     constants[constants[:, "Commodity"] .== "Naphta", string(Scenario_horizon)][1],#390.3
@@ -1245,7 +1245,7 @@ function writing_pipeline_input_data(raw_file_gas, Centroids_df, Routing_nodes_d
     for (Lat_o, Lon_o, Lat_d, Lon_d) in zip(Pipes_df_raw_cluster2cluster_segments[:, "Latitude_origin"], Pipes_df_raw_cluster2cluster_segments[:,"Longitude_origin"], Pipes_df_raw_cluster2cluster_segments[:, "Latitude_destination"], Pipes_df_raw_cluster2cluster_segments[:,"Longitude_destination"])
         P_o = (Lat_o, Lon_o)
         P_d = (Lat_d, Lon_d)
-        distance = haversine(P_o, P_d, 6372.8)
+        distance = haversine_distance(P_o, P_d, 6372.8)
         if (distance > 40.0) .& (detail_level == "dense") # Only connect clusters if they are closer to each other than 40kms 
             delete!(Pipes_df_raw_cluster2cluster_segments, Pipes_df_raw_cluster2cluster_segments[:, "Latitude_origin"] .== Lat_o)
         elseif (distance > 80.0) .& (detail_level == "coarse") # Only connect clusters if they are closer to each other than 80kms 
@@ -1378,8 +1378,76 @@ function writing_pipeline_input_data(raw_file_gas, Centroids_df, Routing_nodes_d
     #         skip
     #     end
     # end
+      # Manually added pipeline segments
+    # Antwerp - Diest
+    # Antwerp: 51.29272515	4.311498277 = C20 
+    # Diest: 51.10021383	5.068412386 = C18
 
 
+    Pipes_df_manual_1 = DataFrame(
+        Pipeline_id = ["PL_C20_C18"],
+        Pipe_name = ["PL_Antwerp_Diest"],
+        Node_origin = ["C20"],
+        Node_destination = ["C18"],
+        Latitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C20","Lat"][1]],
+        Longitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C20","Lon"][1]],
+        Latitude_destination = [Centroids_df[Centroids_df[:, "Cluster"] .=="C18","Lat"][1]],
+        Longitude_destination = [Centroids_df[Centroids_df[:, "Cluster"] .=="C18","Lon"][1]]
+        )
+    # Cologne - Helmond (part 1 of Delta Rhine)
+    # Cologne: 50.99700587	6.92459644 = C88
+
+    Pipes_df_manual_2 = DataFrame(
+        Pipeline_id = ["PL_C88_INET_N_863"],
+        Pipe_name = ["PL_Cologne_Helmond"],
+        Node_origin = ["C88"],
+        Node_destination = ["INET_N_863"],
+        Latitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C88","Lat"][1]],
+        Longitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C88","Lon"][1]],
+        Latitude_destination = [Routing_nodes_filtered_df[Routing_nodes_filtered_df[:, "Node_id"] .=="INET_N_863","Lat"][1]],
+        Longitude_destination = [Routing_nodes_filtered_df[Routing_nodes_filtered_df[:, "Node_id"] .=="INET_N_863","Lon"][1]]
+        )
+    # Tilburg - Helmond (part 2 of Delta Rhine)
+    # Tilburg: 51.6107966	4.9950676
+
+    Pipes_df_manual_3 = DataFrame(
+        Pipeline_id = ["PL_C429_INET_N_863"],
+        Pipe_name = ["PL_Tilburg_Helmond"],
+        Node_origin = ["C429"],
+        Node_destination = ["INET_N_863"],
+        Latitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C429","Lat"][1]],
+        Longitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C429","Lon"][1]],
+        Latitude_destination = [Routing_nodes_filtered_df[Routing_nodes_filtered_df[:, "Node_id"] .=="INET_N_863","Lat"][1]],
+        Longitude_destination = [Routing_nodes_filtered_df[Routing_nodes_filtered_df[:, "Node_id"] .=="INET_N_863","Lon"][1]]
+        )
+    
+    # Brugges - ZB- cluster 
+    # Brugges: 51.22098812	3.230582912 = C26
+
+    Pipes_df_manual_4 = DataFrame(
+        Pipeline_id = ["PL_C26_INET_N_912"],
+        Pipe_name = ["PL_ZB_Brugges"],
+        Node_origin = ["C26"],
+        Node_destination = ["INET_N_912"],
+        Latitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C26","Lat"][1]],
+        Longitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C26","Lon"][1]],
+        Latitude_destination = [Routing_nodes_filtered_df[Routing_nodes_filtered_df[:, "Node_id"] .=="INET_N_912","Lat"][1]],
+        Longitude_destination = [Routing_nodes_filtered_df[Routing_nodes_filtered_df[:, "Node_id"] .=="INET_N_912","Lon"][1]]
+        )
+
+    # Left of Amiens to English Channel 
+    # ENCHANNEL :50.06475255	1.43429425 = C251
+    # Amiens:  C258
+    Pipes_df_manual_5 = DataFrame(
+        Pipeline_id = ["PL_C251_C258"],
+        Pipe_name = ["PL_ENChannel_leftAmien"],
+        Node_origin = ["C251"],
+        Node_destination = ["C258"],
+        Latitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C251","Lat"][1]],
+        Longitude_origin = [Centroids_df[Centroids_df[:, "Cluster"] .=="C251","Lon"][1]],
+        Latitude_destination = [Centroids_df[Centroids_df[:, "Cluster"] .=="C258","Lat"][1]],
+        Longitude_destination = [Centroids_df[Centroids_df[:, "Cluster"] .=="C258","Lon"][1]]
+        )
     # 1) Pipes_df_raw_gas_segments
     # 2) Pipes_df_raw_emitter_segments
     # 3) Pipes_df_raw_terminal_onshore_segments     --> this is about connecting harbour segments to inland routing node
@@ -1390,7 +1458,7 @@ function writing_pipeline_input_data(raw_file_gas, Centroids_df, Routing_nodes_d
     # 8) Pipes_df_raw_cluster2cluster_segments
     # 9) Pipes_df_raw_storage_offshore2offshore_segments
     
-    Pipes_df =   vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(
+    Pipes_df =   vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(vcat(
         Pipes_df_raw_gas_segments, 
         Pipes_df_raw_terminal_onshore_segments), 
         Pipes_df_raw_terminal_offshore_segments), 
@@ -1399,11 +1467,16 @@ function writing_pipeline_input_data(raw_file_gas, Centroids_df, Routing_nodes_d
         Pipes_df_raw_offshore_node_segments), 
         Pipes_df_raw_emitter_Rnode_segments), 
         Pipes_df_raw_cluster2cluster_segments),
-        Pipes_df_raw_storage_offshore2offshore_segments)
+        Pipes_df_raw_storage_offshore2offshore_segments),
+        Pipes_df_manual_1), 
+        Pipes_df_manual_2), 
+        Pipes_df_manual_3),
+        Pipes_df_manual_4),
+        Pipes_df_manual_5)
 
     Pipes_df[!,"Id_qgis"] = [i for i in 1:1:length(Pipes_df[!,"Pipeline_id"])]
     Pipes_df = filter(row -> row.Node_origin != row.Node_destination, Pipes_df)
-    Pipes_df[!, "Distance_km"] = [try maximum([0.1, haversine((Pipes_df[i, "Latitude_origin"], Pipes_df[i, "Longitude_origin"]), (Pipes_df[i, "Latitude_destination"], Pipes_df[i, "Longitude_destination"]), 6372.8)]) catch missing  end for i in 1:1:length(Pipes_df[:,1])]
+    Pipes_df[!, "Distance_km"] = [try maximum([0.1, haversine_distance((Pipes_df[i, "Latitude_origin"], Pipes_df[i, "Longitude_origin"]), (Pipes_df[i, "Latitude_destination"], Pipes_df[i, "Longitude_destination"]), 6372.8)]) catch missing  end for i in 1:1:length(Pipes_df[:,1])]
 
     # Extract latitude and longitude
     latitudes = Pipes_df[:, "Latitude_destination"]
@@ -1460,7 +1533,7 @@ function closest_node_2_node(IndEmitters_df, Routing_nodes_df)
 
         for (lat_n, lon_n, R_name) in zip(Routing_nodes_df[:, "Lat"], Routing_nodes_df[:, "Lon"], Routing_nodes_df[:, "Node_id"])
             P_n = (lat_n, lon_n)
-            distance = maximum([0.0, haversine(P_e, P_n, 6372.8)])
+            distance = maximum([0.0, haversine_distance(P_e, P_n, 6372.8)])
             push!(node_names_temp, R_name)
             push!(distances_temp, distance)
             push!(nodes_lat_temp, lat_n)
@@ -1491,19 +1564,23 @@ function number_closest_node_2_node(IndEmitters_df, Routing_nodes_df, closest_nu
         global P_e = (lat_e, lon_e)
         node_names_temp = []
         distances_temp = []
+        distances_temp_correct = []
         nodes_lat_temp = []
         nodes_lon_temp = []
 
         for (lat_n, lon_n, R_name) in zip(Routing_nodes_df[:, "Lat"], Routing_nodes_df[:, "Lon"], Routing_nodes_df[:, "Node_id"])
-            P_n = (lat_n, lon_n)
-            distance = maximum([0.0, haversine(P_e, P_n, 6372.8)])
+            global P_n = (lat_n, lon_n)
+            distance = maximum([0.0, haversine(P_e, P_n, 6372.8)]) # orginal script 
+            distance_correct = maximum([0.0, haversine_distance(P_e, P_n, 6372.8)]) # right code  
             push!(node_names_temp, R_name)
             push!(distances_temp, distance)
+            push!(distances_temp_correct, distance_correct)
             push!(nodes_lat_temp, lat_n)
             push!(nodes_lon_temp, lon_n)
         end
         non_zero_indices = findall(x -> x > 0.0, distances_temp)
         distances_temp_adj = [maximum([0.1, distances_temp[non_zero_indices][i]]) for i in 1:length(distances_temp[non_zero_indices])]
+        distances_temp_correct_adj = distances_temp_correct[non_zero_indices]
         nodes_lat_temp_adj = nodes_lat_temp[non_zero_indices]
         nodes_lon_temp_adj = nodes_lon_temp[non_zero_indices]
         node_names_temp_adj = node_names_temp[non_zero_indices]
@@ -1513,7 +1590,7 @@ function number_closest_node_2_node(IndEmitters_df, Routing_nodes_df, closest_nu
         push!(two_closest_nodes_lat, [nodes_lat_temp_adj[i] for i in closest_two_indices])
         push!(two_closest_nodes_lon, [nodes_lon_temp_adj[i] for i in closest_two_indices])
         push!(two_node_names, [node_names_temp_adj[i] for i in closest_two_indices])
-        push!(two_distances, [distances_temp_adj[i] for i in closest_two_indices])
+        push!(two_distances, [distances_temp_correct_adj[i] for i in closest_two_indices])
     end
 
     return two_closest_nodes_lat, two_closest_nodes_lon, two_node_names, two_distances
@@ -1593,7 +1670,7 @@ function closests_terminal_storage!(Offshore_storages_df, Terminal_harbour_nodes
 
         for (lat_s, lon_s, S_id) in zip(Offshore_storages_df[:, "Lat"], Offshore_storages_df[:, "Lon"], Offshore_storages_df[:, "Node_id"])
             P_s = (lat_s, lon_s)
-            distance = haversine(P_s, P_t, 6372.8)
+            distance = haversine_distance(P_s, P_t, 6372.8)
             push!(distances, (distance, lat_s, lon_s, S_id))
         end
         sorted_distances = sort(distances, by=x->x[1])
@@ -1670,7 +1747,7 @@ function inecos_line(D, line_coords::Matrix{Float64})
     return B
 end
 
-function haversine_distance(lon1, lat1, lon2, lat2)
+function haversine_distance((lat1,lon1), (lat2, lon2), r2)
     # Convert latitude and longitude from degrees to radians
     lon1, lat1, lon2, lat2 = deg2rad.([lon1, lat1, lon2, lat2])
 
@@ -1690,6 +1767,26 @@ function haversine_distance(lon1, lat1, lon2, lat2)
     return distance
 end
 
+# function haversine_distance(lon1, lat1, lon2, lat2)
+#     # Convert latitude and longitude from degrees to radians
+#     lon1, lat1, lon2, lat2 = deg2rad.([lon1, lat1, lon2, lat2])
+
+#     # Radius of the Earth in kilometers
+#     r = 6371.0
+
+#     # Differences between points
+#     dlon = lon2 - lon1
+#     dlat = lat2 - lat1
+
+#     # Haversine formula
+#     a = sin(dlat / 2)^2 + cos(lat1) * cos(lat2) * sin(dlon / 2)^2
+#     c = 2 * atan(sqrt(a) / sqrt(1 - a))  # `atan2` can be replaced with `atan` and the quotient
+
+#     # Distance in kilometers
+#     distance = r * c
+#     return distance
+# end
+
 
 function point_inland_outside_margin(lon, lat, D, margin_km)
     global B = true
@@ -1698,7 +1795,7 @@ function point_inland_outside_margin(lon, lat, D, margin_km)
             p1 = D[i][j]
             p2 = D[i][j+1]
 
-            dist_to_segment = haversine_distance(p1[1], p2[1], lon, lat)
+            dist_to_segment = haversine_distance((p2[1], p1[1]), (lat, lon), 6372.3)
             if dist_to_segment <= margin_km
                 B = false
                 break
@@ -1724,6 +1821,10 @@ function transform_value_storage_cap(val)
         return 100.0
     end
 end
+
+
+
+
 
 function clustering_DBSCAN(IndEmitters_df, max_distance)
 

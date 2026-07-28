@@ -4,6 +4,7 @@ raw_file_gas =  eval(Symbol("raw_file_gas_", detail_level))                 # Sc
 
 
 ## D.1) Industry data
+CO2_tax_vect = [50, 100, 150, 200, 250, 300]
 for CO2 in CO2_tax_vect
     print(CO2)
     print("euro/tCO2 ETS price --- Scenario name: ")
@@ -13,14 +14,14 @@ for CO2 in CO2_tax_vect
         print("     ")
         for Scenario_horizon in Scenario_horizon_vect
             AidRES_adj_model_perton = AidRES_scenario_adjustment(raw_file, scenario_file, Project_user_interface_file, Scenario_name, Scenario_horizon, CO2_tax)
-            IndEmitters_df  = write_industrial_emitters_input_data(raw_file::Any, scenario_file::Any, industry_data_file::Any, Scenario_name::String, Scenario_horizon::Int64, (CRF = true; CRF), (cluster_save_data = false; cluster_save_data))
+            IndEmitters_df  = write_industrial_emitters_input_data(raw_file::Any, scenario_file::Any, industry_data_file::Any, Scenario_name::String, Scenario_horizon::Int64, (CRF = true; CRF), (cluster_save_data = true; cluster_save_data))
         end
     end
 
 end
 
 # To check the optimal routes
-ROUTE_NAME = [1, 2, "noCC"] # 2
+ROUTE_NAME = [1,"noCC"] # 2
 for route_name in ROUTE_NAME
     Routes_per_product = product_routes(results_product_file::String, raw_file::String,industry_data_file::String, Scenario_name_vect::Vector, Scenario_horizon_vect::Vector, route_name)
 
